@@ -237,7 +237,7 @@ IconData _settingsMenuIcon(String title) => switch (title) {
       'Pengaturan kamera dan izin' => Icons.camera_alt_outlined,
       'Bantuan dan FAQ' => Icons.help_outline,
       'Kirim masukan' => Icons.chat_bubble_outline,
-      'Tentang Gestura' => Icons.info_outline,
+      'Tentang gestura' => Icons.info_outline,
       'Riwayat belajar' => Icons.history,
       _ => Icons.chevron_right
     };

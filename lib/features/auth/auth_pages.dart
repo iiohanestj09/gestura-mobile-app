@@ -410,10 +410,10 @@ String _authSubtitle(String mode) => switch (mode) {
       'Daftar' => 'Buat akun untuk menyimpan progres belajarmu.',
       'Lupa password' =>
         'Masukkan email dan kami bantu kamu mengatur ulang password.',
-      _ => 'Mulai belajar BISINDO dengan Gestura.'
+      _ => 'Mulai belajar BISINDO dengan gestura.'
     };
 String _authAction(String mode) => switch (mode) {
-      'Masuk' => 'Masuk ke Gestura',
+      'Masuk' => 'Masuk ke gestura',
       'Daftar' => 'Buat akun',
       'Lupa password' => 'Kirim tautan reset',
       _ => 'Lanjutkan'

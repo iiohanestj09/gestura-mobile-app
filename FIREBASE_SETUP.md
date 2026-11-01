@@ -1,4 +1,4 @@
-# Menyiapkan Firebase untuk Gestura
+# Menyiapkan Firebase untuk gestura
 
 Firebase Auth dan Cloud Firestore sudah dipakai oleh aplikasi. Ikuti langkah ini
 satu kali untuk menghubungkan aplikasi ke project Firebase milikmu.
@@ -8,7 +8,7 @@ satu kali untuk menghubungkan aplikasi ke project Firebase milikmu.
 1. Buka [Firebase Console](https://console.firebase.google.com/) dan buat project.
 2. Tambahkan aplikasi Android dengan package name `com.example.gestura`.
 3. Buka **Authentication → Sign-in method**, lalu aktifkan **Email/Password**
-   dan **Google**. Untuk Google, isi nama publik `Gestura` dan pilih email
+   dan **Google**. Untuk Google, isi nama publik `gestura` dan pilih email
    support project.
 4. Buka **Firestore Database** dan buat database. Untuk tugas ini, pilih lokasi
    yang dekat dengan pengguna aplikasi.
@@ -31,7 +31,7 @@ satu kali untuk menghubungkan aplikasi ke project Firebase milikmu.
    - Di **Authentication → Settings → Authorized domains**, pastikan
      `gestura-b095.firebaseapp.com` terdaftar.
    - Tautan verifikasi baru dibuat dengan Firebase Hosting link dan
-     `handleCodeInApp`. Android akan membuka Gestura jika tautan berasal dari
+     `handleCodeInApp`. Android akan membuka gestura jika tautan berasal dari
      domain tersebut dan aplikasi terpasang.
 
 ## 2. Hubungkan aplikasi Flutter
@@ -63,9 +63,9 @@ File itu menghubungkan aplikasi ke project Firebase-mu.
 ## 3. Coba alur aplikasi
 
 1. Tekan **Mulai belajar**, isi nama, email, dan password (minimal 8 karakter).
-   Gestura mengirim tautan verifikasi; akun email/password belum bisa membuka
+   gestura mengirim tautan verifikasi; akun email/password belum bisa membuka
    materi sampai tautan itu dibuka. Di ponsel Android yang sama, tautan
-   verifikasi baru akan membuka Gestura dan membawa pengguna ke aplikasi
+   verifikasi baru akan membuka gestura dan membawa pengguna ke aplikasi
    setelah status email diperbarui. Google Sign-In memverifikasi akun melalui
    Google dan bisa langsung digunakan.
 2. Pendaftaran email/password membuat akun di Firebase Authentication dan

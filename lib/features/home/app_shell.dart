@@ -367,7 +367,7 @@ class ProfileTab extends StatelessWidget {
     final user = FirebaseService.currentUser;
     final name = user?.displayName?.trim().isNotEmpty == true
         ? user!.displayName!.trim()
-        : 'Pengguna Gestura';
+        : 'Pengguna gestura';
     final email = user?.email ?? '';
     return StreamBuilder<List<Map<String, dynamic>>>(
         stream: FirebaseService.watchProgress(),
@@ -434,7 +434,7 @@ class ProfileTab extends StatelessWidget {
                 'Pengaturan kamera dan izin',
                 'Bantuan dan FAQ',
                 'Kirim masukan',
-                'Tentang Gestura',
+                'Tentang gestura',
                 'Riwayat belajar'
               ].map((e) => SettingsMenuRow(e, onTap: () => onOpen(e))),
               const SizedBox(height: 10),

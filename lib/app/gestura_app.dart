@@ -21,7 +21,7 @@ class GesturaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-      title: 'Gestura',
+      title: 'gestura',
       debugShowCheckedModeBanner: false,
       theme: GesturaTheme.light,
       scaffoldMessengerKey: appScaffoldMessengerKey,
@@ -72,7 +72,7 @@ class _EmailActionLinkHandlerState extends State<EmailActionLinkHandler> {
       if (handled) {
         appScaffoldMessengerKey.currentState?.showSnackBar(
           const SnackBar(
-            content: Text('Email terverifikasi. Selamat belajar di Gestura!'),
+            content: Text('Email terverifikasi. Selamat belajar di gestura!'),
           ),
         );
       }

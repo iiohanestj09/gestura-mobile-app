@@ -120,7 +120,7 @@ class _DetailPageState extends State<DetailPage> {
         title == 'Kirim masukan') {
       return _formPage(context, title);
     }
-    if (title == 'Bantuan dan FAQ' || title == 'Tentang Gestura') {
+    if (title == 'Bantuan dan FAQ' || title == 'Tentang gestura') {
       return _info(context, title);
     }
     if (title == 'Riwayat belajar') {
@@ -711,20 +711,20 @@ class _DetailPageState extends State<DetailPage> {
   Widget _info(BuildContext context, String title) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(
-            title == 'Tentang Gestura'
+            title == 'Tentang gestura'
                 ? Icons.waving_hand_rounded
                 : Icons.help_outline_rounded,
             size: 48,
             color: GesturaTheme.teal),
         const SizedBox(height: 16),
         PageHeading(title,
-            subtitle: title == 'Tentang Gestura'
-                ? 'Gestura membantu pemula belajar BISINDO melalui materi visual yang bertahap.'
+            subtitle: title == 'Tentang gestura'
+                ? 'gestura membantu pemula belajar BISINDO melalui materi visual yang bertahap.'
                 : 'Temukan jawaban untuk pertanyaan umum.'),
-        if (title == 'Tentang Gestura')
+        if (title == 'Tentang gestura')
           const SoftCard(
               child: Text(
-                  'Gestura • Versi demo UI 1.0\nDibuat sebagai media belajar BISINDO. Materi video peraga dan fitur pengenalan gerakan akan dikembangkan pada tahap berikutnya.'))
+                  'gestura • Versi demo UI 1.0\nDibuat sebagai media belajar BISINDO. Materi video peraga dan fitur pengenalan gerakan akan dikembangkan pada tahap berikutnya.'))
         else
           ...[
             'Apa itu BISINDO?',
@@ -734,7 +734,7 @@ class _DetailPageState extends State<DetailPage> {
                 Padding(
                     padding: EdgeInsets.all(16),
                     child: Text(
-                        'Demo Gestura menyediakan pembelajaran visual secara bertahap. Fitur video dan pengenalan akan menggunakan materi autentik saat tersedia.'))
+                        'Demo gestura menyediakan pembelajaran visual secara bertahap. Fitur video dan pengenalan akan menggunakan materi autentik saat tersedia.'))
               ]))
       ]));
   Widget _history(BuildContext context) =>
