@@ -1,35 +1,85 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../core/gestura_theme.dart';
 import '../features/auth/auth_pages.dart';
+import '../features/home/app_shell.dart';
+import '../data/firebase_service.dart';
 import '../widgets/gestura_widgets.dart';
 
 class GesturaApp extends StatelessWidget {
-  const GesturaApp({super.key});
+  const GesturaApp({this.firebaseError, super.key});
+
+  final String? firebaseError;
+
   @override
   Widget build(BuildContext context) => MaterialApp(
       title: 'Gestura',
       debugShowCheckedModeBanner: false,
       theme: GesturaTheme.light,
-      home: const SplashPage());
+      home: firebaseError == null
+          ? const AuthGate()
+          : FirebaseSetupPage(error: firebaseError!));
 }
 
-class SplashPage extends StatefulWidget {
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<User?>(
+      stream: FirebaseService.auth.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return FirebaseSetupPage(error: snapshot.error.toString());
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SplashPage();
+        }
+        if (snapshot.data != null) {
+          return const AppShell(onLogout: FirebaseService.signOut);
+        }
+        return const WelcomePage();
+      });
+}
+
+class FirebaseSetupPage extends StatelessWidget {
+  const FirebaseSetupPage({required this.error, super.key});
+
+  final String error;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.cloud_off_rounded,
+                      size: 64, color: GesturaTheme.teal),
+                  const SizedBox(height: 18),
+                  Text('Firebase belum terhubung',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Ikuti langkah konfigurasi di FIREBASE_SETUP.md, lalu jalankan ulang aplikasi.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  SelectableText(error,
+                      style: const TextStyle(color: GesturaTheme.muted),
+                      textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class SplashPage extends StatelessWidget {
   const SplashPage({super.key});
-  @override
-  State<SplashPage> createState() => _SplashPageState();
-}
-
-class _SplashPageState extends State<SplashPage> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (_) => const WelcomePage()));
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) => Scaffold(

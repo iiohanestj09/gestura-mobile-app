@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
 import '../../core/gestura_theme.dart';
 import '../../data/sample_data.dart';
+import '../../data/firebase_service.dart';
 import '../../widgets/gestura_widgets.dart';
 
 class DetailPage extends StatefulWidget {
@@ -11,7 +13,7 @@ class DetailPage extends StatefulWidget {
       super.key});
   final String title;
   final void Function(String) onOpen;
-  final VoidCallback onLogout;
+  final Future<void> Function() onLogout;
   @override
   State<DetailPage> createState() => _DetailPageState();
 }
@@ -29,6 +31,34 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   void go(String page) => widget.onOpen(page);
+
+  Future<void> _completeLesson() async {
+    try {
+      await FirebaseService.completeLesson(widget.title);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Progres materi berhasil disimpan.')));
+    } on FirebaseException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              error.message ?? 'Progres gagal disimpan (${error.code}).')));
+    }
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await widget.onLogout();
+      if (context.mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } on FirebaseException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(error.message ?? 'Gagal keluar (${error.code}).')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = widget.title;
@@ -279,7 +309,10 @@ class _DetailPageState extends State<DetailPage> {
             icon: Icons.front_hand_rounded),
         TextButton(
             onPressed: () => go('Kuis materi'),
-            child: const Text('Coba kuis materi'))
+            child: const Text('Coba kuis materi')),
+        const SizedBox(height: 8),
+        PrimaryButton('Tandai materi selesai',
+            onPressed: _completeLesson, icon: Icons.check_circle_outline)
       ]));
   Widget _video(BuildContext context) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -561,14 +594,13 @@ class _DetailPageState extends State<DetailPage> {
         const SizedBox(height: 20),
         PageHeading(title,
             subtitle: title.contains('logout')
-                ? 'Kamu bisa masuk kembali untuk melanjutkan progres demo.'
+                ? 'Kamu bisa masuk kembali untuk melanjutkan progres belajarmu.'
                 : 'Penghapusan akun hanya simulasi. Tidak ada data yang benar-benar dihapus.'),
         PrimaryButton(
-            title.contains('logout')
-                ? 'Keluar dari akun demo'
-                : 'Saya mengerti', onPressed: () {
+            title.contains('logout') ? 'Keluar dari akun' : 'Saya mengerti',
+            onPressed: () {
           if (title.contains('logout')) {
-            widget.onLogout();
+            _logout(context);
           } else {
             Navigator.pop(context);
           }
@@ -706,16 +738,55 @@ class _DetailPageState extends State<DetailPage> {
               ]))
       ]));
   Widget _history(BuildContext context) =>
-      _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const PageHeading('Riwayat belajar',
-            subtitle: 'Ringkasan materi yang pernah kamu buka.'),
-        ...[...SampleData.lessons, ...SampleData.lessons.take(1)]
-            .map((e) => LessonTile(item: e, onTap: () => go(e['title']!))),
-        const SoftCard(
-            color: GesturaTheme.mint,
-            child: Text(
-                '4 materi dipelajari • Riwayat ini menggunakan data demo.',
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, color: GesturaTheme.tealDark)))
-      ]));
+      StreamBuilder<List<Map<String, dynamic>>>(
+        stream: FirebaseService.watchProgress(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _wrap(
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const PageHeading('Riwayat belajar'),
+              Text('Riwayat gagal dimuat: ${snapshot.error}')
+            ]));
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _wrap(const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PageHeading('Riwayat belajar',
+                      subtitle: 'Memuat progres belajarmu...'),
+                  LinearProgressIndicator()
+                ]));
+          }
+
+          final progress = snapshot.data ?? [];
+          return _wrap(
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const PageHeading('Riwayat belajar',
+                subtitle: 'Materi yang sudah kamu tandai selesai.'),
+            if (progress.isEmpty)
+              const SoftCard(
+                  color: GesturaTheme.mint,
+                  child: Text(
+                      'Belum ada materi selesai. Buka materi dan tekan "Tandai materi selesai" untuk menyimpan progres.'))
+            else ...[
+              ...progress.map((item) {
+                final title = item['title'] as String? ?? 'Materi BISINDO';
+                return LessonTile(item: {
+                  'title': title,
+                  'category': 'Materi selesai',
+                  'duration': 'Progres tersimpan',
+                  'icon': '✓'
+                }, onTap: () => go(title));
+              }),
+              SoftCard(
+                  color: GesturaTheme.mint,
+                  child: Text(
+                      '${progress.length} materi selesai • Progres tersimpan di Firestore.',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: GesturaTheme.tealDark)))
+            ]
+          ]));
+        },
+      );
 }

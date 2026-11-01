@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
 import '../../core/gestura_theme.dart';
+import '../../data/firebase_service.dart';
 import '../../widgets/gestura_widgets.dart';
-import '../home/app_shell.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -99,57 +100,65 @@ class _AuthPageState extends State<AuthPage> {
   Future<void> submit() async {
     if (!(form.currentState?.validate() ?? false)) return;
     setState(() => loading = true);
-    await Future.delayed(const Duration(milliseconds: 650));
-    if (!mounted) return;
-    setState(() => loading = false);
-    if (mode == 'Lupa password') {
-      Navigator.push(
+    try {
+      if (mode == 'Lupa password') {
+        await FirebaseService.sendPasswordReset(email.text);
+        if (!mounted) return;
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-              builder: (_) => const AuthPage(mode: 'Reset password')));
-      return;
+            builder: (_) => InfoPage(
+              title: 'Cek email kamu',
+              subtitle:
+                  'Tautan untuk mengatur ulang password telah dikirim ke ${email.text.trim()}.',
+              icon: Icons.mark_email_read_rounded,
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (mode == 'Daftar') {
+        await FirebaseService.signUp(
+          name: name.text,
+          email: email.text,
+          password: password.text,
+        );
+      } else {
+        await FirebaseService.signIn(
+          email: email.text,
+          password: password.text,
+        );
+      }
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } on FirebaseException catch (error) {
+      if (!mounted) return;
+      final message = switch (error.code) {
+        'email-already-in-use' => 'Email ini sudah terdaftar.',
+        'invalid-email' => 'Format email tidak valid.',
+        'weak-password' => 'Password terlalu mudah ditebak.',
+        'invalid-credential' ||
+        'user-not-found' ||
+        'wrong-password' =>
+          'Email atau password tidak sesuai.',
+        'network-request-failed' =>
+          'Tidak dapat terhubung. Periksa koneksi internetmu.',
+        'too-many-requests' => 'Terlalu banyak percobaan. Coba lagi nanti.',
+        _ => error.message ?? 'Terjadi kesalahan Firebase (${error.code}).',
+      };
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => loading = false);
     }
-    if (mode == 'Verifikasi email') {
-      Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => const InfoPage(
-                  title: 'Cek email kamu',
-                  subtitle:
-                      'Kami mengirim instruksi verifikasi ke alamat email yang kamu masukkan.',
-                  icon: Icons.mark_email_read_rounded)));
-      return;
-    }
-    if (mode == 'Reset password') {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password demo berhasil diperbarui.')));
-      return;
-    }
-    if (mode == 'Daftar') {
-      Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => const AuthPage(mode: 'Verifikasi email')));
-      return;
-    }
-    Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-            builder: (_) => AppShell(onLogout: () {
-                  Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const AuthPage(mode: 'Masuk')),
-                      (_) => false);
-                })),
-        (_) => false);
   }
 
   @override
   Widget build(BuildContext context) {
     final isSignUp = mode == 'Daftar';
-    final hasPassword = mode != 'Lupa password' && mode != 'Verifikasi email';
+    final hasPassword = mode != 'Lupa password';
     return Scaffold(
         appBar: AppBar(),
         body: SafeArea(
@@ -211,18 +220,6 @@ class _AuthPageState extends State<AuthPage> {
                                 ? 'Password harus minimal 8 karakter'
                                 : null)
                       ],
-                      if (mode == 'Reset password') ...[
-                        const SizedBox(height: 18),
-                        const Text('Konfirmasi password'),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                                hintText: 'Ulangi password baru'),
-                            validator: (v) => v != password.text
-                                ? 'Password belum sama'
-                                : null)
-                      ],
                       if (mode == 'Masuk')
                         Align(
                             alignment: Alignment.centerRight,
@@ -262,15 +259,13 @@ String _authSubtitle(String mode) => switch (mode) {
       'Daftar' => 'Buat akun untuk menyimpan progres belajarmu.',
       'Lupa password' =>
         'Masukkan email dan kami bantu kamu mengatur ulang password.',
-      'Reset password' => 'Buat password baru untuk akun demo kamu.',
-      _ => 'Satu langkah lagi sebelum mulai belajar BISINDO.'
+      _ => 'Mulai belajar BISINDO dengan Gestura.'
     };
 String _authAction(String mode) => switch (mode) {
       'Masuk' => 'Masuk ke Gestura',
       'Daftar' => 'Buat akun',
       'Lupa password' => 'Kirim tautan reset',
-      'Reset password' => 'Simpan password baru',
-      _ => 'Kirim ulang email verifikasi'
+      _ => 'Lanjutkan'
     };
 
 class InfoPage extends StatelessWidget {

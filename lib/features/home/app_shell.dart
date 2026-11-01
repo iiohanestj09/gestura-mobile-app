@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../core/gestura_theme.dart';
 import '../../data/sample_data.dart';
+import '../../data/firebase_service.dart';
 import '../../widgets/gestura_widgets.dart';
 import '../details/detail_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({required this.onLogout, super.key});
-  final VoidCallback onLogout;
+  final Future<void> Function() onLogout;
   @override
   State<AppShell> createState() => _AppShellState();
 }
@@ -69,7 +70,8 @@ class HomeTab extends StatelessWidget {
                   const Text('Selamat pagi,',
                       style: TextStyle(color: GesturaTheme.muted)),
                   const SizedBox(height: 3),
-                  Text('Yohanes 👋',
+                  Text(
+                      '${FirebaseService.currentUser?.displayName?.split(' ').first ?? 'teman'} 👋',
                       style: Theme.of(context).textTheme.headlineSmall),
                 ],
               ),
@@ -136,66 +138,78 @@ class HomeTab extends StatelessWidget {
         ),
       );
 
-  Widget _continueLearning(BuildContext context) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-            gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF815CE4), Color(0xFF4B2B91)]),
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: [
-              BoxShadow(
-                  color: GesturaTheme.tealDark.withValues(alpha: .25),
-                  blurRadius: 24,
-                  offset: const Offset(0, 12))
-            ]),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const LabelChip('LANJUTKAN BELAJAR', color: Color(0xFFF0E9FF)),
-            const SizedBox(height: 14),
-            const Text('Salam dan sapaan',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800)),
-            const SizedBox(height: 5),
-            const Text('Kosakata • 5 menit',
-                style: TextStyle(color: Colors.white70)),
-            const SizedBox(height: 17),
-            Row(
+  Widget _continueLearning(BuildContext context) => StreamBuilder<bool>(
+        stream: FirebaseService.watchLessonCompleted('Salam dan sapaan'),
+        builder: (context, snapshot) {
+          final progress = snapshot.data == true ? 1.0 : 0.0;
+          final percent = (progress * 100).round();
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF815CE4), Color(0xFF4B2B91)]),
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                      color: GesturaTheme.tealDark.withValues(alpha: .25),
+                      blurRadius: 24,
+                      offset: const Offset(0, 12))
+                ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(9),
-                    child: const LinearProgressIndicator(
-                      value: .45,
-                      minHeight: 7,
-                      backgroundColor: Colors.white24,
-                      color: GesturaTheme.yellow,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text('45%',
+                const LabelChip('LANJUTKAN BELAJAR', color: Color(0xFFF0E9FF)),
+                const SizedBox(height: 14),
+                const Text('Salam dan sapaan',
                     style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700)),
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 5),
+                Text(
+                    snapshot.hasError
+                        ? 'Progres tidak dapat dimuat'
+                        : snapshot.data == true
+                            ? 'Materi selesai'
+                            : 'Kosakata • 5 menit',
+                    style: const TextStyle(color: Colors.white70)),
+                const SizedBox(height: 17),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 7,
+                          backgroundColor: Colors.white24,
+                          color: GesturaTheme.yellow,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text('$percent%',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () => onOpen('Salam dan sapaan'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white70),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Lanjutkan materi  →'),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: () => onOpen('Salam dan sapaan'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white70),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-              child: const Text('Lanjutkan materi  →'),
-            ),
-          ],
-        ),
+          );
+        },
       );
 
   Widget _categoryGrid(BuildContext context) => GridView.builder(
@@ -349,71 +363,92 @@ class ProfileTab extends StatelessWidget {
   const ProfileTab({required this.onOpen, super.key});
   final void Function(String) onOpen;
   @override
-  Widget build(BuildContext context) => SafeArea(
-          child: ListView(padding: const EdgeInsets.all(20), children: [
-        const PageHeading('Profil saya'),
-        SoftCard(
-            child: Row(children: [
-          const CircleAvatar(
-              radius: 32,
-              backgroundColor: GesturaTheme.mint,
-              child: Text('YP',
-                  style: TextStyle(
-                      color: GesturaTheme.teal,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20))),
-          const SizedBox(width: 14),
-          const Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text('Yohanes Putra',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 17,
-                        color: GesturaTheme.ink)),
-                Text('yohanes@email.com',
-                    style: TextStyle(color: GesturaTheme.muted, fontSize: 13))
+  Widget build(BuildContext context) {
+    final user = FirebaseService.currentUser;
+    final name = user?.displayName?.trim().isNotEmpty == true
+        ? user!.displayName!.trim()
+        : 'Pengguna Gestura';
+    final email = user?.email ?? '';
+    return StreamBuilder<List<Map<String, dynamic>>>(
+        stream: FirebaseService.watchProgress(),
+        builder: (context, snapshot) => SafeArea(
+                child: ListView(padding: const EdgeInsets.all(20), children: [
+              const PageHeading('Profil saya'),
+              SoftCard(
+                  child: Row(children: [
+                CircleAvatar(
+                    radius: 32,
+                    backgroundColor: GesturaTheme.mint,
+                    child: Text(_initials(name),
+                        style: const TextStyle(
+                            color: GesturaTheme.teal,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 20))),
+                const SizedBox(width: 14),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 17,
+                              color: GesturaTheme.ink)),
+                      Text(email,
+                          style: const TextStyle(
+                              color: GesturaTheme.muted, fontSize: 13))
+                    ])),
+                IconButton(
+                    onPressed: () => onOpen('Edit profil'),
+                    icon: const Icon(Icons.edit_outlined))
               ])),
-          IconButton(
-              onPressed: () => onOpen('Edit profil'),
-              icon: const Icon(Icons.edit_outlined))
-        ])),
-        const SizedBox(height: 14),
-        const SoftCard(
-            color: Color(0xFFFFF1D2),
-            child: Row(children: [
-              Icon(Icons.auto_stories_rounded, color: GesturaTheme.teal),
-              SizedBox(width: 12),
-              Expanded(
-                  child: Text(
-                      '4 materi dipelajari\nProgres belajarmu tersimpan di perangkat ini.',
-                      style: TextStyle(
-                          height: 1.5,
-                          fontWeight: FontWeight.w600,
-                          color: GesturaTheme.ink)))
-            ])),
-        const SizedBox(height: 22),
-        const PageHeading('Akun dan preferensi'),
-        ...[
-          'Edit profil',
-          'Pengaturan akun',
-          'Ubah password',
-          'Ubah email',
-          'Pengaturan notifikasi',
-          'Pengaturan tampilan',
-          'Pengaturan kamera dan izin',
-          'Bantuan dan FAQ',
-          'Kirim masukan',
-          'Tentang Gestura',
-          'Riwayat belajar'
-        ].map((e) => SettingsMenuRow(e, onTap: () => onOpen(e))),
-        const SizedBox(height: 10),
-        SettingsMenuRow('Keluar',
-            icon: Icons.logout_rounded,
-            onTap: () => onOpen('Konfirmasi logout')),
-        SettingsMenuRow('Hapus akun',
-            icon: Icons.delete_outline_rounded,
-            onTap: () => onOpen('Konfirmasi hapus akun'))
-      ]));
+              const SizedBox(height: 14),
+              SoftCard(
+                  color: const Color(0xFFFFF1D2),
+                  child: Row(children: [
+                    const Icon(Icons.auto_stories_rounded,
+                        color: GesturaTheme.teal),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Text(
+                            snapshot.hasError
+                                ? 'Progres gagal dimuat.\n${snapshot.error}'
+                                : snapshot.connectionState ==
+                                        ConnectionState.waiting
+                                    ? 'Memuat progres belajar...'
+                                    : '${snapshot.data?.length ?? 0} materi dipelajari\nProgres belajarmu tersimpan di Firestore.',
+                            style: const TextStyle(
+                                height: 1.5,
+                                fontWeight: FontWeight.w600,
+                                color: GesturaTheme.ink)))
+                  ])),
+              const SizedBox(height: 22),
+              const PageHeading('Akun dan preferensi'),
+              ...[
+                'Edit profil',
+                'Pengaturan akun',
+                'Ubah password',
+                'Ubah email',
+                'Pengaturan notifikasi',
+                'Pengaturan tampilan',
+                'Pengaturan kamera dan izin',
+                'Bantuan dan FAQ',
+                'Kirim masukan',
+                'Tentang Gestura',
+                'Riwayat belajar'
+              ].map((e) => SettingsMenuRow(e, onTap: () => onOpen(e))),
+              const SizedBox(height: 10),
+              SettingsMenuRow('Keluar',
+                  icon: Icons.logout_rounded,
+                  onTap: () => onOpen('Konfirmasi logout')),
+              SettingsMenuRow('Hapus akun',
+                  icon: Icons.delete_outline_rounded,
+                  onTap: () => onOpen('Konfirmasi hapus akun'))
+            ])));
+  }
+}
+
+String _initials(String name) {
+  final parts = name.split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
+  return parts.take(2).map((part) => part[0].toUpperCase()).join();
 }
