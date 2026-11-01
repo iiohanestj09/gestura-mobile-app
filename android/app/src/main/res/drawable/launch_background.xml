@@ -3,8 +3,11 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/gestura_splash_background" />
     <item
-        android:drawable="@drawable/gestura_brand_mark"
-        android:gravity="center"
-        android:width="96dp"
-        android:height="96dp" />
+        android:gravity="center">
+        <bitmap
+            android:src="@drawable/gestura_brand_mark"
+            android:gravity="center"
+            android:width="96dp"
+            android:height="96dp" />
+    </item>
 </layer-list>
