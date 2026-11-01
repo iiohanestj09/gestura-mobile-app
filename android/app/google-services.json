@@ -12,7 +12,20 @@
           "package_name": "com.example.gestura"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "950261579746-deun344rbvftn9l0kakbsolpg2u3324o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.gestura",
+            "certificate_hash": "007586fe24b313c4254d95cada36f64bcb2352b5"
+          }
+        },
+        {
+          "client_id": "950261579746-kfmhv89rolth06m91rrthi8lag05nel8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCEM67TVfeg67cdaCbJSW77aKoCA_88ie0"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "950261579746-kfmhv89rolth06m91rrthi8lag05nel8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

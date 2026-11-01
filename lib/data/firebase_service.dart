@@ -1,11 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class FirebaseService {
   static final FirebaseAuth auth = FirebaseAuth.instance;
   static final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  static Future<void>? _googleSignInInitialization;
 
   static User? get currentUser => auth.currentUser;
+
+  static bool canAccessApp(User user) {
+    final providers = user.providerData.map((provider) => provider.providerId);
+    return user.emailVerified || providers.contains('google.com');
+  }
 
   static Future<void> signUp({
     required String name,
@@ -22,6 +29,13 @@ class FirebaseService {
     }
 
     await user.updateDisplayName(name.trim());
+    await user.sendEmailVerification(
+      ActionCodeSettings(
+        url: 'https://gestura-b095.firebaseapp.com/continue',
+        androidPackageName: 'com.example.gestura',
+        handleCodeInApp: true,
+      ),
+    );
     await _saveProfile(user, name.trim());
   }
 
@@ -39,10 +53,69 @@ class FirebaseService {
     }
   }
 
+  static Future<void> signInWithGoogle() async {
+    await (_googleSignInInitialization ??= GoogleSignIn.instance.initialize());
+    final googleUser = await GoogleSignIn.instance.authenticate();
+    final idToken = googleUser.authentication.idToken;
+    if (idToken == null) {
+      throw StateError(
+        'Token Google tidak tersedia. Perbarui konfigurasi Firebase Android.',
+      );
+    }
+
+    final credential = GoogleAuthProvider.credential(idToken: idToken);
+    final result = await auth.signInWithCredential(credential);
+    final user = result.user;
+    if (user != null) {
+      await _saveProfile(user, user.displayName ?? '');
+    }
+  }
+
+  static Future<void> resendEmailVerification() async {
+    final user = currentUser;
+    if (user == null) {
+      throw StateError('Tidak ada akun yang sedang masuk.');
+    }
+    await user.sendEmailVerification();
+  }
+
+  static Future<void> reloadCurrentUser() async {
+    await currentUser?.reload();
+  }
+
+  static Future<bool> handleEmailVerificationLink(Uri link) async {
+    final actionUri = _findEmailActionUri(link);
+    if (actionUri == null ||
+        actionUri.queryParameters['mode'] != 'verifyEmail') {
+      return false;
+    }
+
+    final actionCode = actionUri.queryParameters['oobCode'];
+    if (actionCode == null || actionCode.isEmpty) {
+      throw const FormatException('Kode verifikasi tidak ditemukan di tautan.');
+    }
+
+    final actionInfo = await auth.checkActionCode(actionCode);
+    if (actionInfo.operation != ActionCodeInfoOperation.verifyEmail) {
+      throw const FormatException('Tautan ini bukan tautan verifikasi email.');
+    }
+
+    await auth.applyActionCode(actionCode);
+    await currentUser?.reload();
+    return true;
+  }
+
   static Future<void> sendPasswordReset(String email) =>
       auth.sendPasswordResetEmail(email: email.trim());
 
-  static Future<void> signOut() => auth.signOut();
+  static Future<void> signOut() async {
+    await auth.signOut();
+    final initialization = _googleSignInInitialization;
+    if (initialization != null) {
+      await initialization;
+      await GoogleSignIn.instance.signOut();
+    }
+  }
 
   static Future<void> completeLesson(String title) async {
     final user = currentUser;
@@ -113,4 +186,22 @@ class FirebaseService {
   static String _lessonId(String title) => Uri.encodeComponent(
         title.trim().toLowerCase(),
       );
+
+  static Uri? _findEmailActionUri(Uri uri, [int depth = 0]) {
+    if (depth > 3) return null;
+    final query = uri.queryParameters;
+    if (query.containsKey('oobCode') && query.containsKey('mode')) {
+      return uri;
+    }
+
+    for (final key in ['link', 'deep_link_id', 'continueUrl']) {
+      final nestedLink = query[key];
+      if (nestedLink == null) continue;
+      final nestedUri = Uri.tryParse(nestedLink);
+      if (nestedUri == null) continue;
+      final result = _findEmailActionUri(nestedUri, depth + 1);
+      if (result != null) return result;
+    }
+    return null;
+  }
 }

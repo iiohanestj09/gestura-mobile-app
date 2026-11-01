@@ -73,3 +73,5 @@ venv/
 # Android signing
 *.jks
 *.keystore
+
+google-services.json

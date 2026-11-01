@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import '../core/gestura_theme.dart';
 import '../features/auth/auth_pages.dart';
 import '../features/home/app_shell.dart';
@@ -7,8 +10,13 @@ import '../data/firebase_service.dart';
 import '../widgets/gestura_widgets.dart';
 
 class GesturaApp extends StatelessWidget {
-  const GesturaApp({this.firebaseError, super.key});
+  const GesturaApp({
+    required this.appLinks,
+    this.firebaseError,
+    super.key,
+  });
 
+  final AppLinks appLinks;
   final String? firebaseError;
 
   @override
@@ -16,9 +24,81 @@ class GesturaApp extends StatelessWidget {
       title: 'Gestura',
       debugShowCheckedModeBanner: false,
       theme: GesturaTheme.light,
+      scaffoldMessengerKey: appScaffoldMessengerKey,
       home: firebaseError == null
-          ? const AuthGate()
+          ? EmailActionLinkHandler(
+              appLinks: appLinks,
+              child: const AuthGate(),
+            )
           : FirebaseSetupPage(error: firebaseError!));
+}
+
+final GlobalKey<ScaffoldMessengerState> appScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
+class EmailActionLinkHandler extends StatefulWidget {
+  const EmailActionLinkHandler({
+    required this.appLinks,
+    required this.child,
+    super.key,
+  });
+
+  final AppLinks appLinks;
+  final Widget child;
+
+  @override
+  State<EmailActionLinkHandler> createState() => _EmailActionLinkHandlerState();
+}
+
+class _EmailActionLinkHandlerState extends State<EmailActionLinkHandler> {
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _linkSubscription = widget.appLinks.uriLinkStream.listen(
+      _handleLink,
+      onError: (Object error) {
+        appScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text('Tautan aplikasi gagal dibaca: $error')),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleLink(Uri link) async {
+    try {
+      final handled = await FirebaseService.handleEmailVerificationLink(link);
+      if (handled) {
+        appScaffoldMessengerKey.currentState?.showSnackBar(
+          const SnackBar(
+            content: Text('Email terverifikasi. Selamat belajar di Gestura!'),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (error) {
+      appScaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message ?? 'Verifikasi email gagal (${error.code}).',
+          ),
+        ),
+      );
+    } on FormatException catch (error) {
+      appScaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class AuthGate extends StatelessWidget {
@@ -26,7 +106,7 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => StreamBuilder<User?>(
-      stream: FirebaseService.auth.authStateChanges(),
+      stream: FirebaseService.auth.userChanges(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return FirebaseSetupPage(error: snapshot.error.toString());
@@ -34,8 +114,12 @@ class AuthGate extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SplashPage();
         }
-        if (snapshot.data != null) {
+        final user = snapshot.data;
+        if (user != null && FirebaseService.canAccessApp(user)) {
           return const AppShell(onLogout: FirebaseService.signOut);
+        }
+        if (user != null) {
+          return EmailVerificationPage(email: user.email ?? '');
         }
         return const WelcomePage();
       });
