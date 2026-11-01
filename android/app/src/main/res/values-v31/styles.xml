@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/gestura_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/gestura_brand_mark</item>
+    </style>
+</resources>

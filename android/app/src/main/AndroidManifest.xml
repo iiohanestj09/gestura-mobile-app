@@ -2,7 +2,7 @@
     <application
         android:label="gestura"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/gestura_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
