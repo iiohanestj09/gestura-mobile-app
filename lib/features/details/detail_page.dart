@@ -158,7 +158,7 @@ class _DetailPageState extends State<DetailPage> {
                 }, onTap: () => go(e)))
       ]));
   Widget _category(BuildContext context, String title) {
-    final list = SampleData.categories.take(3)
+    final list = SampleData.categories
         .where((e) => title == 'Kategori pembelajaran' || e['name'] == title)
         .toList();
     return _wrap(
@@ -169,7 +169,8 @@ class _DetailPageState extends State<DetailPage> {
       ...list.map((c) => LessonTile(item: {
             'title': c['name'] as String,
             'category': 'Materi BISINDO',
-            'duration': c['name'] == 'Angka' ? '10 angka' : c['count'] as String,
+            'duration':
+                c['name'] == 'Angka' ? '10 angka' : c['count'] as String,
             'icon': c['name'] == 'Angka' ? '123' : c['icon'] as String
           }, onTap: () => go(c['name'] as String))),
       if (title != 'Kategori pembelajaran') ...[

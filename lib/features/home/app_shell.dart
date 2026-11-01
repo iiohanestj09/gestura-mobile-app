@@ -237,9 +237,14 @@ class HomeTab extends StatelessWidget {
                         maxLines: 1,
                         softWrap: false,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 13)),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontSize: 13)),
                     Text(
-                      category['name'] == 'Angka' ? '10 angka' : category['count'] as String,
+                      category['name'] == 'Angka'
+                          ? '10 angka'
+                          : category['count'] as String,
                       style: const TextStyle(
                           fontSize: 11, color: GesturaTheme.muted),
                     ),
@@ -289,7 +294,8 @@ class LearnTab extends StatelessWidget {
         ...SampleData.categories.map((c) => LessonTile(item: {
               'title': c['name'] as String,
               'category': 'BISINDO',
-              'duration': c['name'] == 'Angka' ? '10 angka' : c['count'] as String,
+              'duration':
+                  c['name'] == 'Angka' ? '10 angka' : c['count'] as String,
               'icon': c['name'] == 'Angka' ? '123' : c['icon'] as String
             }, onTap: () => onOpen(c['name'] as String))),
         TextButton.icon(
