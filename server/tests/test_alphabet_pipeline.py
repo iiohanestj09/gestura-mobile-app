@@ -17,6 +17,7 @@ from app.alphabet_pipeline import (  # noqa: E402
     image_to_features,
     predict_feature,
 )
+from scripts.run_alphabet_webcam import PredictionSmoother  # noqa: E402
 
 
 def make_hand(offset_x: float) -> list[SimpleNamespace]:
@@ -78,6 +79,8 @@ class AlphabetPipelineTests(unittest.TestCase):
         self.assertEqual(detected_hands, 0)
         self.assertEqual(result["status"], "not_recognized")
         self.assertIsNone(result["label"])
+        self.assertIsNone(result["candidate"])
+        self.assertEqual(result["threshold"], 0.5)
 
     def test_low_confidence_returns_not_recognized(self) -> None:
         features, _ = image_to_features(
@@ -96,6 +99,37 @@ class AlphabetPipelineTests(unittest.TestCase):
         self.assertEqual(result["status"], "not_recognized")
         self.assertEqual(result["candidate"], "B")
         self.assertIsNone(result["label"])
+
+    def test_smoother_requires_consistent_accepted_predictions(self) -> None:
+        smoother = PredictionSmoother(window_size=3, required_votes=2)
+        result = {
+            "status": "recognized",
+            "candidate": "A",
+            "confidence": 0.9,
+        }
+
+        self.assertIsNone(smoother.update(result)[0])
+        stable_label, confidence = smoother.update(result)
+
+        self.assertEqual(stable_label, "A")
+        self.assertAlmostEqual(confidence, 0.9)
+
+    def test_smoother_resets_on_rejected_prediction(self) -> None:
+        smoother = PredictionSmoother(window_size=3, required_votes=2)
+        accepted = {
+            "status": "recognized",
+            "candidate": "A",
+            "confidence": 0.9,
+        }
+        rejected = {
+            "status": "not_recognized",
+            "candidate": "A",
+            "confidence": 0.4,
+        }
+        smoother.update(accepted)
+        self.assertIsNone(smoother.update(rejected)[0])
+        self.assertIsNone(smoother.update(rejected)[0])
+        self.assertIsNone(smoother.update(rejected)[0])
 
 
 if __name__ == "__main__":

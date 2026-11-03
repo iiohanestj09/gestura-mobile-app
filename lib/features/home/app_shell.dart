@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/gestura_theme.dart';
 import '../../data/sample_data.dart';
 import '../../data/firebase_service.dart';
+import '../../data/gesture_api_service.dart';
 import '../../widgets/gestura_widgets.dart';
 import '../details/detail_page.dart';
 
@@ -18,7 +19,6 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) => Scaffold(
       body: IndexedStack(index: index, children: [
         HomeTab(onOpen: open),
-        LearnTab(onOpen: open),
         PracticeTab(onOpen: open),
         ProfileTab(onOpen: open)
       ]),
@@ -29,11 +29,7 @@ class _AppShellState extends State<AppShell> {
             NavigationDestination(
                 icon: Icon(Icons.home_outlined),
                 selectedIcon: Icon(Icons.home_rounded),
-                label: 'Home'),
-            NavigationDestination(
-                icon: Icon(Icons.menu_book_outlined),
-                selectedIcon: Icon(Icons.menu_book_rounded),
-                label: 'Belajar'),
+                label: 'Beranda'),
             NavigationDestination(
                 icon: Icon(Icons.front_hand_outlined),
                 selectedIcon: Icon(Icons.front_hand_rounded),
@@ -41,7 +37,7 @@ class _AppShellState extends State<AppShell> {
             NavigationDestination(
                 icon: Icon(Icons.person_outline),
                 selectedIcon: Icon(Icons.person_rounded),
-                label: 'Profil')
+                label: 'Akun')
           ]));
   void open(String title) => Navigator.push(
       context,
@@ -275,7 +271,7 @@ class HomeTab extends StatelessWidget {
                             ?.copyWith(fontSize: 13)),
                     Text(
                       category['name'] == 'Angka'
-                          ? '10 angka'
+                          ? '9 angka'
                           : category['count'] as String,
                       style: const TextStyle(
                           fontSize: 11, color: GesturaTheme.muted),
@@ -289,124 +285,202 @@ class HomeTab extends StatelessWidget {
       );
 }
 
-class LearnTab extends StatelessWidget {
-  const LearnTab({required this.onOpen, super.key});
-  final void Function(String) onOpen;
-  @override
-  Widget build(BuildContext context) => SafeArea(
-          child: ListView(padding: const EdgeInsets.all(20), children: [
-        const PageHeading('Ruang belajar',
-            subtitle: 'Pilih materi dan belajar dengan ritmemu.'),
-        ...SampleData.courses.map((c) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: SoftCard(
-                onTap: () => onOpen(c),
-                child: Row(children: [
-                  Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                          color: GesturaTheme.mint,
-                          borderRadius: BorderRadius.circular(17)),
-                      child: const Icon(Icons.menu_book_rounded,
-                          color: GesturaTheme.teal)),
-                  const SizedBox(width: 14),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        Text(c, style: Theme.of(context).textTheme.titleMedium),
-                        const Text('Kelas pemula • Materi bertahap')
-                      ])),
-                  const Icon(Icons.arrow_forward_ios_rounded, size: 16)
-                ])))),
-        const SizedBox(height: 12),
-        const PageHeading('Jalur belajar',
-            subtitle: 'Alfabet → Kosakata → Angka BISINDO'),
-        ...SampleData.categories.map((c) => LessonTile(item: {
-              'title': c['name'] as String,
-              'category': 'BISINDO',
-              'duration':
-                  c['name'] == 'Angka' ? '10 angka' : c['count'] as String,
-              'icon': c['name'] == 'Angka' ? '123' : c['icon'] as String
-            }, onTap: () => onOpen(c['name'] as String))),
-        TextButton.icon(
-            onPressed: () => onOpen('Riwayat belajar'),
-            icon: const Icon(Icons.history),
-            label: const Text('Lihat riwayat belajar'))
-      ]));
-}
-
-class PracticeTab extends StatelessWidget {
+class PracticeTab extends StatefulWidget {
   const PracticeTab({required this.onOpen, super.key});
   final void Function(String) onOpen;
+
+  @override
+  State<PracticeTab> createState() => _PracticeTabState();
+}
+
+class _PracticeTabState extends State<PracticeTab> {
+  GestureCategory? selectedCategory;
+
+  void _openTarget(GestureCategory category, String target) {
+    widget.onOpen('Kamera praktik|${category.apiValue}|$target');
+  }
+
   @override
   Widget build(BuildContext context) => SafeArea(
-          child: ListView(padding: const EdgeInsets.all(20), children: [
-        const PageHeading('Ruang latihan',
-            subtitle: 'Latih gerakan dari materi yang sudah kamu pelajari.'),
-        SoftCard(
-            color: GesturaTheme.mint,
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.front_hand_rounded,
-                  color: GesturaTheme.teal, size: 34),
-              const SizedBox(height: 13),
-              Text('Siap mencoba?',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 6),
-              const Text(
-                  'Gunakan preview kamera untuk latihan mandiri. Gerakan belum dapat dinilai otomatis.'),
-              const SizedBox(height: 16),
-              PrimaryButton('Mulai latihan',
-                  onPressed: () => onOpen('Instruksi praktik'))
-            ])),
-        const SizedBox(height: 22),
-        const PageHeading('Pilih materi latihan'),
-        const SoftCard(
-            child: Text(
-                'Daftar berikut adalah topik latihan. Panduan isyarat terverifikasi untuk tiap topik belum tersedia.')),
-        ...['Halo', 'Terima kasih', 'Huruf A'].map((e) => LessonTile(item: {
-              'title': e,
-              'category': 'Topik latihan',
-              'duration': 'Materi',
-              'icon': '✋'
-            }, onTap: () => onOpen(e))),
-        const SizedBox(height: 10),
-        StreamBuilder<List<Map<String, dynamic>>>(
-          stream: FirebaseService.watchPracticeSessions(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return SoftCard(
-                  child: Text('Riwayat sesi latihan gagal dimuat: '
-                      '${snapshot.error}'));
-            }
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const LinearProgressIndicator();
-            }
-            final sessions = snapshot.data ?? [];
-            if (sessions.isEmpty) {
-              return const SoftCard(
-                  child: Text(
-                      'Sesi latihan yang diselesaikan akan muncul di sini.'));
-            }
-            final duration = sessions.first['durationSeconds'] as int? ?? 0;
-            return SoftCard(
-              color: GesturaTheme.mint,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          children: [
+            if (selectedCategory == null) ...[
+              const PageHeading(
+                'Pilih latihan',
+                subtitle: 'Pilih kategori yang ingin kamu latih.',
+              ),
+              _categoryCard(
+                context,
+                category: GestureCategory.alphabet,
+                icon: Icons.back_hand_rounded,
+                subtitle: 'Latihan huruf A sampai Z',
+                color: GesturaTheme.mint,
+              ),
+              const SizedBox(height: 12),
+              _categoryCard(
+                context,
+                category: GestureCategory.vocabulary,
+                icon: Icons.chat_bubble_rounded,
+                subtitle: '32 kosakata BISINDO',
+                color: const Color(0xFFFFF1D2),
+              ),
+              const SizedBox(height: 12),
+              _categoryCard(
+                context,
+                category: GestureCategory.digit,
+                icon: Icons.pin_rounded,
+                subtitle: 'Latihan angka 1 sampai 9',
+                color: const Color(0xFFEDE7FF),
+              ),
+              const SizedBox(height: 20),
+              TextButton.icon(
+                onPressed: () => widget.onOpen('Riwayat latihan'),
+                icon: const Icon(Icons.history_rounded),
+                label: const Text('Lihat riwayat latihan'),
+              ),
+            ] else ...[
+              TextButton.icon(
+                onPressed: () => setState(() => selectedCategory = null),
+                icon: const Icon(Icons.arrow_back_rounded),
+                label: const Text('Semua kategori'),
+                style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+              ),
+              PageHeading(
+                selectedCategory!.displayName,
+                subtitle: 'Pilih target untuk memulai latihan.',
+              ),
+              if (selectedCategory == GestureCategory.alphabet)
+                _alphabetTargets()
+              else if (selectedCategory == GestureCategory.digit)
+                _digitTargets()
+              else
+                _vocabularyTargets(),
+            ],
+          ],
+        ),
+      );
+
+  Widget _categoryCard(
+    BuildContext context, {
+    required GestureCategory category,
+    required IconData icon,
+    required String subtitle,
+    required Color color,
+  }) =>
+      SoftCard(
+        color: color,
+        onTap: () => setState(() => selectedCategory = category),
+        child: Row(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .8),
+                borderRadius: BorderRadius.circular(17),
+              ),
+              child: Icon(icon, color: GesturaTheme.tealDark, size: 28),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Sesi terakhir: ${_formatPracticeDuration(duration)}'),
-                  const SizedBox(height: 8),
-                  TextButton(
-                      onPressed: () => onOpen('Riwayat latihan'),
-                      child: const Text('Lihat riwayat latihan')),
+                  Text(
+                    category.displayName,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(subtitle,
+                      style: const TextStyle(color: GesturaTheme.muted)),
                 ],
               ),
-            );
-          },
-        )
-      ]));
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                size: 16, color: GesturaTheme.tealDark),
+          ],
+        ),
+      );
+
+  Widget _alphabetTargets() => GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: GestureCategory.alphabet.labels.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.15,
+        ),
+        itemBuilder: (context, index) {
+          final label = GestureCategory.alphabet.labels[index];
+          return SoftCard(
+            color: Colors.white,
+            padding: EdgeInsets.zero,
+            onTap: () => _openTarget(GestureCategory.alphabet, label),
+            child: Center(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: GesturaTheme.tealDark,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+  Widget _digitTargets() => GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: GestureCategory.digit.labels.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.3,
+        ),
+        itemBuilder: (context, index) {
+          final label = GestureCategory.digit.labels[index];
+          return SoftCard(
+            color: const Color(0xFFEDE7FF),
+            padding: EdgeInsets.zero,
+            onTap: () => _openTarget(GestureCategory.digit, label),
+            child: Center(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: GesturaTheme.tealDark,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+  Widget _vocabularyTargets() => Column(
+        children: GestureCategory.vocabulary.labels
+            .map(
+              (label) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: LessonTile(
+                  item: {
+                    'title': label,
+                    'category': 'Kosakata BISINDO',
+                    'duration': 'Latihan gerakan',
+                    'icon': '💬',
+                  },
+                  onTap: () => _openTarget(GestureCategory.vocabulary, label),
+                ),
+              ),
+            )
+            .toList(growable: false),
+      );
 }
 
 class ProfileTab extends StatelessWidget {
@@ -435,7 +509,7 @@ class ProfileTab extends StatelessWidget {
                   progressItems.where((item) => item['kind'] == 'quiz').length;
               return SafeArea(
                   child: ListView(padding: const EdgeInsets.all(20), children: [
-                const PageHeading('Profil saya'),
+                const PageHeading('Akun saya'),
                 SoftCard(
                     child: Row(children: [
                   CircleAvatar(
@@ -516,10 +590,4 @@ class ProfileTab extends StatelessWidget {
 String _initials(String name) {
   final parts = name.split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
   return parts.take(2).map((part) => part[0].toUpperCase()).join();
-}
-
-String _formatPracticeDuration(int seconds) {
-  final minutes = seconds ~/ 60;
-  final remainingSeconds = seconds % 60;
-  return '$minutes menit $remainingSeconds detik';
 }

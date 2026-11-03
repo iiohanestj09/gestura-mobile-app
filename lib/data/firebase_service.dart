@@ -221,7 +221,12 @@ class FirebaseService {
     await _reauthenticate(user, password: password);
 
     final userDocument = firestore.collection('users').doc(user.uid);
-    for (final collection in ['progress', 'feedback', 'practiceSessions']) {
+    for (final collection in [
+      'progress',
+      'feedback',
+      'practiceSessions',
+      'practicePredictions',
+    ]) {
       final documents = userDocument.collection(collection);
       while (true) {
         final snapshot = await documents.limit(450).get();
@@ -289,7 +294,52 @@ class FirebaseService {
     }, SetOptions(merge: true));
   }
 
-  static Future<void> recordPracticeSession(int durationSeconds) async {
+  static Future<void> recordGesturePrediction({
+    required String category,
+    required String targetLabel,
+    required String predictionLabel,
+    required double confidence,
+    required int stableMilliseconds,
+    required bool matchedTarget,
+  }) async {
+    final user = currentUser;
+    if (user == null) {
+      throw StateError('Kamu harus masuk untuk menyimpan prediksi.');
+    }
+    if (category != 'alphabet' &&
+        category != 'digit' &&
+        category != 'vocabulary') {
+      throw ArgumentError('Kategori prediksi tidak dikenal.');
+    }
+    if (targetLabel.isEmpty ||
+        predictionLabel.isEmpty ||
+        confidence < 0 ||
+        confidence > 1 ||
+        stableMilliseconds < 0) {
+      throw ArgumentError('Data prediksi gerakan tidak valid.');
+    }
+    await firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('practicePredictions')
+        .add({
+      'category': category,
+      'targetLabel': targetLabel,
+      'predictionLabel': predictionLabel,
+      'confidence': confidence,
+      'stableMilliseconds': stableMilliseconds,
+      'matchedTarget': matchedTarget,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  static Future<void> recordPracticeSession(
+    int durationSeconds, {
+    required String category,
+    required String targetLabel,
+    required String predictionLabel,
+    required double confidence,
+  }) async {
     final user = currentUser;
     if (user == null) {
       throw StateError('Kamu harus masuk untuk menyimpan sesi latihan.');
@@ -297,12 +347,28 @@ class FirebaseService {
     if (durationSeconds < 1) {
       throw ArgumentError('Sesi latihan harus berlangsung minimal 1 detik.');
     }
+    if (category != 'alphabet' &&
+        category != 'digit' &&
+        category != 'vocabulary') {
+      throw ArgumentError('Kategori latihan tidak dikenal.');
+    }
+    if (targetLabel.isEmpty ||
+        predictionLabel != targetLabel ||
+        confidence < 0 ||
+        confidence > 1) {
+      throw ArgumentError('Hasil sesi latihan tidak valid.');
+    }
     await firestore
         .collection('users')
         .doc(user.uid)
         .collection('practiceSessions')
         .add({
       'durationSeconds': durationSeconds,
+      'category': category,
+      'targetLabel': targetLabel,
+      'predictionLabel': predictionLabel,
+      'confidence': confidence,
+      'outcome': 'correct',
       'createdAt': FieldValue.serverTimestamp(),
     });
   }

@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/gestura_theme.dart';
 import '../../data/sample_data.dart';
 import '../../data/firebase_service.dart';
+import '../../data/gesture_api_service.dart';
 import '../auth/auth_pages.dart';
 import 'camera_practice_page.dart';
 import '../../widgets/gestura_widgets.dart';
@@ -55,6 +56,36 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   void go(String page) => widget.onOpen(page);
+
+  GestureCategory? _categoryForLesson(String title) {
+    if (title.startsWith('Huruf ')) return GestureCategory.alphabet;
+    if (title.startsWith('Angka ')) return GestureCategory.digit;
+    if (GestureCategory.vocabulary.labels.contains(title)) {
+      return GestureCategory.vocabulary;
+    }
+    return null;
+  }
+
+  String? _targetForLesson(String title, GestureCategory category) {
+    if (category == GestureCategory.alphabet && title.startsWith('Huruf ')) {
+      return title.substring('Huruf '.length);
+    }
+    if (category == GestureCategory.digit && title.startsWith('Angka ')) {
+      return title.substring('Angka '.length);
+    }
+    if (category == GestureCategory.vocabulary &&
+        category.labels.contains(title)) {
+      return title;
+    }
+    return null;
+  }
+
+  GestureCategory? _categoryFromRoute(String route) {
+    for (final category in GestureCategory.values) {
+      if (category.apiValue == route) return category;
+    }
+    return null;
+  }
 
   Future<void> _completeLesson(String title) async {
     try {
@@ -144,7 +175,7 @@ class _DetailPageState extends State<DetailPage> {
     final title = widget.title;
     return Scaffold(
         appBar: AppBar(
-            title: Text(title,
+            title: Text(title.split('|').first,
                 style:
                     const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
             actions: title == 'Cari materi'
@@ -167,8 +198,24 @@ class _DetailPageState extends State<DetailPage> {
     if (title == 'Konfirmasi logout' || title == 'Konfirmasi hapus akun') {
       return _confirm(context, title);
     }
+    if (title.startsWith('Instruksi praktik|')) {
+      final parts = title.split('|');
+      return _practiceInstructions(
+        context,
+        category: parts.length > 1 ? _categoryFromRoute(parts[1]) : null,
+        target: parts.length > 2 ? parts[2] : null,
+      );
+    }
     if (title == 'Instruksi praktik') {
       return _practiceInstructions(context);
+    }
+    if (title.startsWith('Kamera praktik|')) {
+      final parts = title.split('|');
+      return _camera(
+        context,
+        category: parts.length > 1 ? _categoryFromRoute(parts[1]) : null,
+        target: parts.length > 2 ? parts[2] : null,
+      );
     }
     if (title == 'Kamera praktik') {
       return _camera(context);
@@ -232,7 +279,8 @@ class _DetailPageState extends State<DetailPage> {
     if (title == 'Pembelajaran kalimat') {
       return _sentences(context);
     }
-    if (title == 'Pembelajaran kosakata' || SampleData.words.contains(title)) {
+    if (title == 'Pembelajaran kosakata' ||
+        GestureCategory.vocabulary.labels.contains(title)) {
       return _vocabulary(context, title);
     }
     if (title == 'Daftar materi' || title == 'Daftar lesson') {
@@ -262,7 +310,7 @@ class _DetailPageState extends State<DetailPage> {
                 e['title']!.toLowerCase().contains(search.text.toLowerCase()))
             .map((e) => LessonTile(item: e, onTap: () => go(e['title']!))),
         const PageHeading('Kosakata'),
-        ...SampleData.words
+        ...GestureCategory.vocabulary.labels
             .where((e) =>
                 search.text.isEmpty ||
                 e.toLowerCase().contains(search.text.toLowerCase()))
@@ -285,8 +333,7 @@ class _DetailPageState extends State<DetailPage> {
       ...list.map((c) => LessonTile(item: {
             'title': c['name'] as String,
             'category': 'Materi BISINDO',
-            'duration':
-                c['name'] == 'Angka' ? '10 angka' : c['count'] as String,
+            'duration': c['name'] == 'Angka' ? '9 angka' : c['count'] as String,
             'icon': c['name'] == 'Angka' ? '123' : c['icon'] as String
           }, onTap: () => go(c['name'] as String))),
       if (title != 'Kategori pembelajaran') ...[
@@ -297,19 +344,22 @@ class _DetailPageState extends State<DetailPage> {
             .map((e) => LessonTile(item: e, onTap: () => go(e['title']!))),
         if (title == 'Angka')
           ...List.generate(
-            10,
-            (number) => LessonTile(
-              item: {
-                'title': 'Angka $number',
-                'category': 'Angka BISINDO',
-                'duration': 'Materi',
-                'icon': '$number',
-              },
-              onTap: () => go('Angka $number'),
-            ),
+            9,
+            (index) {
+              final number = index + 1;
+              return LessonTile(
+                item: {
+                  'title': 'Angka $number',
+                  'category': 'Angka BISINDO',
+                  'duration': 'Materi',
+                  'icon': '$number',
+                },
+                onTap: () => go('Angka $number'),
+              );
+            },
           ),
         if (title == 'Kosakata')
-          ...SampleData.words.map((w) => LessonTile(item: {
+          ...GestureCategory.vocabulary.labels.map((w) => LessonTile(item: {
                 'title': w,
                 'category': 'BISINDO',
                 'duration': 'Materi',
@@ -353,12 +403,14 @@ class _DetailPageState extends State<DetailPage> {
             subtitle: 'Ikuti urutan atau buka materi yang kamu butuhkan.'),
         ...SampleData.lessons
             .map((e) => LessonTile(item: e, onTap: () => go(e['title']!))),
-        ...SampleData.words.take(4).map((e) => LessonTile(item: {
-              'title': e,
-              'category': 'Kosakata',
-              'duration': 'Materi',
-              'icon': '💬'
-            }, onTap: () => go(e))),
+        ...GestureCategory.vocabulary.labels.take(4).map((e) => LessonTile(
+                item: {
+                  'title': e,
+                  'category': 'Kosakata',
+                  'duration': 'Materi',
+                  'icon': '💬'
+                },
+                onTap: () => go(e))),
         const SizedBox(height: 8),
         PrimaryButton('Mulai kuis materi', onPressed: () => go('Kuis materi'))
       ]));
@@ -383,9 +435,14 @@ class _DetailPageState extends State<DetailPage> {
             child: Text(
                 'Video contoh dan uraian gerakan terverifikasi untuk materi ini belum tersedia. Jangan jadikan daftar kata ini sebagai panduan bentuk isyarat.')),
         const SizedBox(height: 20),
-        PrimaryButton('Latih gerakan ini',
-            onPressed: () => go('Instruksi praktik'),
-            icon: Icons.front_hand_rounded),
+        PrimaryButton('Latih gerakan ini', onPressed: () {
+          final category = _categoryForLesson(title);
+          final target =
+              category == null ? null : _targetForLesson(title, category);
+          go(category == null || target == null
+              ? 'Instruksi praktik'
+              : 'Instruksi praktik|${category.apiValue}|$target');
+        }, icon: Icons.front_hand_rounded),
         TextButton(
             onPressed: () => go('Kuis materi'),
             child: const Text('Coba kuis materi')),
@@ -436,7 +493,7 @@ class _DetailPageState extends State<DetailPage> {
             title == 'Pembelajaran kosakata' ? 'Kosakata sehari-hari' : title,
             subtitle: 'Daftar kata untuk latihan kosakata.'),
         if (title == 'Pembelajaran kosakata')
-          ...SampleData.words.map((e) => LessonTile(item: {
+          ...GestureCategory.vocabulary.labels.map((e) => LessonTile(item: {
                 'title': e,
                 'category': 'BISINDO',
                 'duration': 'Materi',
@@ -451,7 +508,8 @@ class _DetailPageState extends State<DetailPage> {
               'Video dan panduan bentuk isyarat untuk kata ini belum tersedia.'),
           const SizedBox(height: 22),
           PrimaryButton('Latihan kata ini',
-              onPressed: () => go('Instruksi praktik'))
+              onPressed: () => go(
+                  'Instruksi praktik|${GestureCategory.vocabulary.apiValue}|$title'))
         ]
       ]));
   Widget _sentences(BuildContext context) =>
@@ -493,11 +551,18 @@ class _DetailPageState extends State<DetailPage> {
         PrimaryButton('Lihat topik materi',
             onPressed: () => go('Daftar lesson'))
       ]));
-  Widget _practiceInstructions(BuildContext context) =>
+  Widget _practiceInstructions(
+    BuildContext context, {
+    GestureCategory? category,
+    String? target,
+  }) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const LabelChip('LATIHAN MANDIRI'),
         const SizedBox(height: 14),
-        const PageHeading('Siapkan latihanmu',
+        PageHeading(
+            category == null || target == null
+                ? 'Siapkan latihanmu'
+                : 'Latihan ${category.displayName}: $target',
             subtitle: 'Pilih gerakan yang baru saja kamu pelajari.'),
         const SoftCard(
             color: GesturaTheme.mint,
@@ -524,24 +589,31 @@ class _DetailPageState extends State<DetailPage> {
             '• Cari tempat dengan cahaya cukup\n• Pastikan tangan terlihat di kamera\n• Ikuti panduan dari pengajar atau sumber BISINDO terverifikasi'),
         const SizedBox(height: 22),
         PrimaryButton('Buka kamera latihan',
-            onPressed: () => go('Kamera praktik'),
+            onPressed: () => go(category == null || target == null
+                ? 'Kamera praktik'
+                : 'Kamera praktik|${category.apiValue}|$target'),
             icon: Icons.camera_alt_rounded),
         const SizedBox(height: 8),
         const Center(
             child: Text(
-                'Gestura belum dapat menilai ketepatan gerakan secara otomatis.',
+                'Prediksi model masih bersifat percobaan dan bukan pengganti koreksi pengajar BISINDO.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: GesturaTheme.muted, fontSize: 12)))
       ]));
-  Widget _camera(BuildContext context) => const CameraPracticePage();
+  Widget _camera(
+    BuildContext context, {
+    GestureCategory? category,
+    String? target,
+  }) =>
+      CameraPracticePage(initialCategory: category, initialTarget: target);
   Widget _result(BuildContext context, String title) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const PageHeading('Pengenalan gerakan belum tersedia',
+        const PageHeading('Hasil pengenalan gerakan',
             subtitle:
-                'Gestura belum dapat memeriksa apakah gerakan bahasa isyarat sudah benar.'),
+                'Hasil prediksi ditampilkan pada halaman kamera latihan.'),
         const SoftCard(
             child: Text(
-                'Model Computer Vision dan data BISINDO terverifikasi belum tersedia. Preview kamera hanya membantu latihan mandiri; aplikasi tidak menebak atau mengklaim gerakanmu benar.')),
+                'Model yang tersedia masih baseline. Prediksi dapat keliru, khususnya pada variasi signer, kondisi kamera, atau isyarat di luar data latih.')),
         const SizedBox(height: 20),
         PrimaryButton('Kembali ke kamera',
             onPressed: () => go('Kamera praktik'),
@@ -636,7 +708,7 @@ class _DetailPageState extends State<DetailPage> {
                   'Izin kamera diminta oleh Android saat fitur digunakan.'),
           const SoftCard(
               child: Text(
-                  'Gestura belum memiliki model pengenalan bahasa isyarat. Kamera tidak akan menganalisis atau menyimpan gambar.')),
+                  'Kamera merekam video pendek untuk dianalisis backend. Rekaman dihapus setelah pemrosesan; hasil pengenalan tidak disimpan sebagai media.')),
           const SizedBox(height: 12),
           PrimaryButton('Buka preview kamera',
               onPressed: () => go('Kamera praktik'),
@@ -876,7 +948,7 @@ class _DetailPageState extends State<DetailPage> {
         if (title == 'Tentang Gestura')
           const SoftCard(
               child: Text(
-                  'Gestura membantu mengelola progres belajar dan menyediakan preview kamera untuk latihan mandiri. Video peraga dan pengenalan gerakan otomatis belum tersedia.'))
+                  'Gestura membantu mengelola progres belajar dan menyediakan prediksi gerakan berbasis model baseline. Video peraga BISINDO terverifikasi belum tersedia.'))
         else
           ...[
             (
@@ -887,12 +959,12 @@ class _DetailPageState extends State<DetailPage> {
             (
               question: 'Apakah pengenalan kamera sudah aktif?',
               answer:
-                  'Kamera hanya menampilkan preview untuk latihan mandiri. Gestura belum memiliki model BISINDO untuk mengenali atau menilai gerakan.'
+                  'Ya. Pilih kategori di halaman kamera, rekam video singkat, dan backend akan memberikan prediksi. Hasilnya masih baseline dan dapat keliru.'
             ),
             (
               question: 'Bagaimana cara memulai belajar?',
               answer:
-                  'Pilih topik dari tab Belajar. Tandai materi selesai untuk menyimpan progres, atau gunakan preview kamera untuk latihan mandiri.'
+                  'Pilih topik dari tab Belajar. Tandai materi selesai untuk menyimpan progres, atau buka tab Latihan untuk mencoba pengenalan melalui kamera.'
             ),
           ].map((faq) => ExpansionTile(title: Text(faq.question), children: [
                 Padding(
@@ -987,8 +1059,17 @@ class _DetailPageState extends State<DetailPage> {
                     child: Text('Belum ada sesi latihan yang diselesaikan.'))
               else
                 ...List.generate(sessions.length, (index) {
-                  final seconds =
-                      sessions[index]['durationSeconds'] as int? ?? 0;
+                  final session = sessions[index];
+                  final seconds = session['durationSeconds'] as int? ?? 0;
+                  final category = switch (session['category']) {
+                    'alphabet' => 'Alfabet',
+                    'digit' => 'Angka',
+                    'vocabulary' => 'Kosakata',
+                    _ => 'Latihan',
+                  };
+                  final target = session['targetLabel'] as String? ?? '—';
+                  final confidence =
+                      (session['confidence'] as num?)?.toDouble() ?? 0;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: SoftCard(
@@ -998,9 +1079,23 @@ class _DetailPageState extends State<DetailPage> {
                               color: GesturaTheme.teal),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              'Sesi latihan ${sessions.length - index}',
-                              style: Theme.of(context).textTheme.titleMedium,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '$category • target $target',
+                                  style:
+                                      Theme.of(context).textTheme.titleMedium,
+                                ),
+                                Text(
+                                  'Prediksi cocok • confidence '
+                                  '${(confidence * 100).toStringAsFixed(1)}%',
+                                  style: const TextStyle(
+                                    color: GesturaTheme.muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           Text(_formatPracticeDuration(seconds)),

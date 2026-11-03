@@ -24,9 +24,50 @@ service cloud.firestore {
         allow read: if request.auth != null && request.auth.uid == userId;
         allow create: if request.auth != null
           && request.auth.uid == userId
-          && request.resource.data.keys().hasOnly(['durationSeconds', 'createdAt'])
+          && request.resource.data.keys().hasOnly([
+            'durationSeconds',
+            'category',
+            'targetLabel',
+            'predictionLabel',
+            'confidence',
+            'outcome',
+            'createdAt'
+          ])
           && request.resource.data.durationSeconds is int
-          && request.resource.data.durationSeconds > 0;
+          && request.resource.data.durationSeconds > 0
+          && request.resource.data.category in ['alphabet', 'digit', 'vocabulary']
+          && request.resource.data.targetLabel is string
+          && request.resource.data.predictionLabel is string
+          && request.resource.data.confidence is number
+          && request.resource.data.confidence >= 0
+          && request.resource.data.confidence <= 1
+          && request.resource.data.outcome == 'correct';
+        allow update: if false;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /practicePredictions/{predictionId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly([
+            'category',
+            'targetLabel',
+            'predictionLabel',
+            'confidence',
+            'stableMilliseconds',
+            'matchedTarget',
+            'createdAt'
+          ])
+          && request.resource.data.category in ['alphabet', 'digit', 'vocabulary']
+          && request.resource.data.targetLabel is string
+          && request.resource.data.predictionLabel is string
+          && request.resource.data.confidence is number
+          && request.resource.data.confidence >= 0
+          && request.resource.data.confidence <= 1
+          && request.resource.data.stableMilliseconds is int
+          && request.resource.data.stableMilliseconds >= 0
+          && request.resource.data.matchedTarget is bool;
         allow update: if false;
         allow delete: if request.auth != null && request.auth.uid == userId;
       }

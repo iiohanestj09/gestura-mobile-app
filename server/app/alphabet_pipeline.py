@@ -62,10 +62,15 @@ def ensure_landmarker_asset(path: Path = LANDMARKER_ASSET) -> Path:
     return path
 
 
-def create_landmarker_options(model_path: Path) -> Any:
+def create_landmarker_options(
+    model_path: Path,
+    running_mode: Any = None,
+) -> Any:
+    if running_mode is None:
+        running_mode = mp.tasks.vision.RunningMode.IMAGE
     return mp.tasks.vision.HandLandmarkerOptions(
         base_options=mp.tasks.BaseOptions(model_asset_path=str(model_path)),
-        running_mode=mp.tasks.vision.RunningMode.IMAGE,
+        running_mode=running_mode,
         num_hands=2,
         min_hand_detection_confidence=0.35,
         min_hand_presence_confidence=0.35,
@@ -174,7 +179,9 @@ def predict_feature(
     if feature[FEATURES_PER_HAND - 1] == 0 and feature[-1] == 0:
         return {
             "label": None,
+            "candidate": None,
             "confidence": 0.0,
+            "threshold": float(artifact["confidence_threshold"]),
             "status": "not_recognized",
             "reason": "Tidak ada tangan yang terdeteksi.",
         }
