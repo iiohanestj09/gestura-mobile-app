@@ -1,7 +1,7 @@
 class SampleData {
   static const categories = [
     {'name': 'Alfabet', 'icon': '✋', 'color': 0xFFE4DAFF, 'count': '26 huruf'},
-    {'name': 'Kosakata', 'icon': '💬', 'color': 0xFFFFE9C9, 'count': '48 kata'},
+    {'name': 'Kosakata', 'icon': '💬', 'color': 0xFFFFE9C9, 'count': '8 kata'},
     {
       'name': 'Angka',
       'icon': '123',
@@ -23,25 +23,25 @@ class SampleData {
     {
       'title': 'Salam dan sapaan',
       'category': 'Kosakata',
-      'duration': '5 menit',
+      'duration': 'Topik',
       'icon': '👋'
     },
     {
       'title': 'Memperkenalkan diri',
       'category': 'Kalimat',
-      'duration': '8 menit',
+      'duration': 'Topik',
       'icon': '🙋'
     },
     {
       'title': 'Huruf A sampai E',
       'category': 'Alfabet',
-      'duration': '6 menit',
+      'duration': 'Topik',
       'icon': '🔤'
     },
     {
       'title': 'Di kafe',
       'category': 'Percakapan',
-      'duration': '10 menit',
+      'duration': 'Topik',
       'icon': '☕'
     },
   ];

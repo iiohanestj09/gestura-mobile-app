@@ -85,10 +85,11 @@ class FirebaseService {
 
   static Future<bool> handleEmailVerificationLink(Uri link) async {
     final actionUri = _findEmailActionUri(link);
-    if (actionUri == null ||
-        actionUri.queryParameters['mode'] != 'verifyEmail') {
+    if (actionUri == null) {
       return false;
     }
+    final mode = actionUri.queryParameters['mode'];
+    if (mode != 'verifyEmail' && mode != 'verifyAndChangeEmail') return false;
 
     final actionCode = actionUri.queryParameters['oobCode'];
     if (actionCode == null || actionCode.isEmpty) {
@@ -96,17 +97,111 @@ class FirebaseService {
     }
 
     final actionInfo = await auth.checkActionCode(actionCode);
-    if (actionInfo.operation != ActionCodeInfoOperation.verifyEmail) {
-      throw const FormatException('Tautan ini bukan tautan verifikasi email.');
+    final expectedOperation = mode == 'verifyEmail'
+        ? ActionCodeInfoOperation.verifyEmail
+        : ActionCodeInfoOperation.verifyAndChangeEmail;
+    if (actionInfo.operation != expectedOperation) {
+      throw const FormatException('Tautan ini bukan tautan email yang sesuai.');
     }
 
     await auth.applyActionCode(actionCode);
     await currentUser?.reload();
+    if (mode == 'verifyAndChangeEmail' && currentUser != null) {
+      await syncProfile(currentUser!);
+    }
     return true;
   }
 
   static Future<void> sendPasswordReset(String email) =>
       auth.sendPasswordResetEmail(email: email.trim());
+
+  static Future<void> updateDisplayName(String name) async {
+    final user = currentUser;
+    if (user == null) throw StateError('Tidak ada akun yang sedang masuk.');
+    final normalizedName = name.trim();
+    if (normalizedName.length < 2 || normalizedName.length > 50) {
+      throw ArgumentError('Nama harus terdiri dari 2 sampai 50 karakter.');
+    }
+    await user.updateDisplayName(normalizedName);
+    await firestore.collection('users').doc(user.uid).set({
+      'uid': user.uid,
+      'email': user.email,
+      'displayName': normalizedName,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    await user.reload();
+  }
+
+  static Future<void> sendEmailChangeVerification(
+    String newEmail, {
+    String? password,
+  }) async {
+    final user = currentUser;
+    if (user == null) throw StateError('Tidak ada akun yang sedang masuk.');
+    final normalizedEmail = newEmail.trim();
+    if (normalizedEmail.isEmpty ||
+        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(normalizedEmail)) {
+      throw ArgumentError('Masukkan alamat email yang valid.');
+    }
+    if (normalizedEmail.toLowerCase() == user.email?.toLowerCase()) {
+      throw ArgumentError('Email baru harus berbeda dari email saat ini.');
+    }
+    await _reauthenticate(user, password: password);
+    await user.verifyBeforeUpdateEmail(
+      normalizedEmail,
+      ActionCodeSettings(
+        url: 'https://gestura-b095.firebaseapp.com/continue',
+        androidPackageName: 'com.example.gestura',
+        handleCodeInApp: true,
+      ),
+    );
+  }
+
+  static Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = currentUser;
+    if (user == null) throw StateError('Tidak ada akun yang sedang masuk.');
+    if (!user.providerData
+        .any((provider) => provider.providerId == 'password')) {
+      throw StateError(
+        'Password akun ini dikelola oleh penyedia login, bukan Gestura.',
+      );
+    }
+    if (newPassword.length < 8) {
+      throw ArgumentError('Password baru minimal 8 karakter.');
+    }
+    await _reauthenticate(user, password: currentPassword);
+    await user.updatePassword(newPassword);
+  }
+
+  static Stream<Map<String, dynamic>?> watchProfile() {
+    final user = currentUser;
+    if (user == null) throw StateError('Tidak ada akun yang sedang masuk.');
+    return firestore
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .map((snapshot) => snapshot.data());
+  }
+
+  static Future<void> submitFeedback(String message) async {
+    final user = currentUser;
+    if (user == null) throw StateError('Tidak ada akun yang sedang masuk.');
+    final content = message.trim();
+    if (content.length < 5 || content.length > 2000) {
+      throw ArgumentError('Masukan harus terdiri dari 5 sampai 2000 karakter.');
+    }
+    await firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('feedback')
+        .add({
+      'message': content,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
 
   static Future<void> signOut() async {
     await auth.signOut();
@@ -115,6 +210,32 @@ class FirebaseService {
       await initialization;
       await GoogleSignIn.instance.signOut();
     }
+  }
+
+  static Future<void> deleteAccount({String? password}) async {
+    final user = currentUser;
+    if (user == null) {
+      throw StateError('Tidak ada akun yang sedang masuk.');
+    }
+
+    await _reauthenticate(user, password: password);
+
+    final userDocument = firestore.collection('users').doc(user.uid);
+    for (final collection in ['progress', 'feedback', 'practiceSessions']) {
+      final documents = userDocument.collection(collection);
+      while (true) {
+        final snapshot = await documents.limit(450).get();
+        if (snapshot.docs.isEmpty) break;
+        final batch = firestore.batch();
+        for (final document in snapshot.docs) {
+          batch.delete(document.reference);
+        }
+        await batch.commit();
+      }
+    }
+
+    await userDocument.delete();
+    await user.delete();
   }
 
   static Future<void> completeLesson(String title) async {
@@ -133,8 +254,74 @@ class FirebaseService {
       'lessonId': id,
       'title': title,
       'completed': true,
+      'kind': 'lesson',
       'completedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  static Future<void> recordQuizResult({
+    required int correctAnswers,
+    required int totalQuestions,
+  }) async {
+    final user = currentUser;
+    if (user == null) {
+      throw StateError('Kamu harus masuk untuk menyimpan hasil kuis.');
+    }
+    if (totalQuestions <= 0 ||
+        correctAnswers < 0 ||
+        correctAnswers > totalQuestions) {
+      throw ArgumentError('Hasil kuis tidak valid.');
+    }
+    const title = 'Kuis salam dan sapaan';
+    await firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('progress')
+        .doc(_lessonId(title))
+        .set({
+      'lessonId': _lessonId(title),
+      'title': title,
+      'completed': true,
+      'kind': 'quiz',
+      'correctAnswers': correctAnswers,
+      'totalQuestions': totalQuestions,
+      'completedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> recordPracticeSession(int durationSeconds) async {
+    final user = currentUser;
+    if (user == null) {
+      throw StateError('Kamu harus masuk untuk menyimpan sesi latihan.');
+    }
+    if (durationSeconds < 1) {
+      throw ArgumentError('Sesi latihan harus berlangsung minimal 1 detik.');
+    }
+    await firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('practiceSessions')
+        .add({
+      'durationSeconds': durationSeconds,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  static Stream<List<Map<String, dynamic>>> watchPracticeSessions() {
+    final user = currentUser;
+    if (user == null) {
+      throw StateError('Kamu harus masuk untuk melihat sesi latihan.');
+    }
+    return firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('practiceSessions')
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((document) => document.data())
+            .toList(growable: false));
   }
 
   static Stream<bool> watchLessonCompleted(String title) {
@@ -171,16 +358,64 @@ class FirebaseService {
   static Future<void> _saveProfile(User user, String name) async {
     final profile = firestore.collection('users').doc(user.uid);
     final existing = await profile.get();
+    final existingName = existing.data()?['displayName'] as String?;
+    final resolvedName = existingName?.trim().isNotEmpty == true
+        ? existingName!.trim()
+        : name.trim();
     final data = <String, Object?>{
       'uid': user.uid,
       'email': user.email,
-      'displayName': name,
+      'displayName': resolvedName,
       'updatedAt': FieldValue.serverTimestamp(),
     };
     if (!existing.exists) {
       data['createdAt'] = FieldValue.serverTimestamp();
     }
     await profile.set(data, SetOptions(merge: true));
+  }
+
+  static Future<void> syncProfile(User user) async {
+    await firestore.collection('users').doc(user.uid).set({
+      'uid': user.uid,
+      'email': user.email,
+      'displayName': user.displayName ?? '',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> _reauthenticate(
+    User user, {
+    String? password,
+  }) async {
+    final providers = user.providerData.map((provider) => provider.providerId);
+    if (providers.contains('password')) {
+      final email = user.email;
+      if (email == null || password == null || password.isEmpty) {
+        throw StateError('Masukkan password aplikasi untuk melanjutkan.');
+      }
+      await user.reauthenticateWithCredential(
+        EmailAuthProvider.credential(email: email, password: password),
+      );
+      return;
+    }
+    if (providers.contains('google.com')) {
+      await (_googleSignInInitialization ??=
+          GoogleSignIn.instance.initialize());
+      final googleUser = await GoogleSignIn.instance.authenticate();
+      final idToken = googleUser.authentication.idToken;
+      if (idToken == null) {
+        throw StateError(
+          'Token Google tidak tersedia. Perbarui konfigurasi Firebase Android.',
+        );
+      }
+      await user.reauthenticateWithCredential(
+        GoogleAuthProvider.credential(idToken: idToken),
+      );
+      return;
+    }
+    throw StateError(
+      'Metode masuk akun ini belum didukung untuk operasi ini.',
+    );
   }
 
   static String _lessonId(String title) => Uri.encodeComponent(

@@ -49,12 +49,14 @@ app.*.map.json
 
 # Dataset video dan gambar
 server/dataset/
+server/processed/
 *.mp4
 *.mov
 *.avi
 
 # Model hasil training
 server/trained_models/
+server/.cache/
 
 # Python
 __pycache__/

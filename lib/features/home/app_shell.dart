@@ -64,16 +64,34 @@ class HomeTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Selamat pagi,',
-                      style: TextStyle(color: GesturaTheme.muted)),
-                  const SizedBox(height: 3),
-                  Text(
-                      '${FirebaseService.currentUser?.displayName?.split(' ').first ?? 'teman'} 👋',
-                      style: Theme.of(context).textTheme.headlineSmall),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Selamat pagi,',
+                        style: TextStyle(color: GesturaTheme.muted)),
+                    const SizedBox(height: 3),
+                    StreamBuilder<Map<String, dynamic>?>(
+                      stream: FirebaseService.watchProfile(),
+                      builder: (context, snapshot) {
+                        final profileName =
+                            snapshot.data?['displayName'] as String?;
+                        final name = profileName?.trim().isNotEmpty == true
+                            ? profileName!.trim()
+                            : FirebaseService.currentUser?.displayName
+                                    ?.trim() ??
+                                '';
+                        final firstName = name.isEmpty
+                            ? 'teman'
+                            : name.split(RegExp(r'\s+')).first;
+                        return Text('$firstName 👋',
+                            style: Theme.of(context).textTheme.headlineSmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis);
+                      },
+                    ),
+                  ],
+                ),
               ),
               IconButton.filledTonal(
                 onPressed: () => onOpen('Notifikasi'),
@@ -173,7 +191,7 @@ class HomeTab extends StatelessWidget {
                         ? 'Progres tidak dapat dimuat'
                         : snapshot.data == true
                             ? 'Materi selesai'
-                            : 'Kosakata • 5 menit',
+                            : 'Kosakata BISINDO • Materi',
                     style: const TextStyle(color: Colors.white70)),
                 const SizedBox(height: 17),
                 Row(
@@ -338,24 +356,56 @@ class PracticeTab extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
               const Text(
-                  'Pilih satu gerakan. Kamera dan pengenalan di sini masih simulasi.'),
+                  'Gunakan preview kamera untuk latihan mandiri. Gerakan belum dapat dinilai otomatis.'),
               const SizedBox(height: 16),
               PrimaryButton('Mulai latihan',
                   onPressed: () => onOpen('Instruksi praktik'))
             ])),
         const SizedBox(height: 22),
         const PageHeading('Pilih materi latihan'),
+        const SoftCard(
+            child: Text(
+                'Daftar berikut adalah topik latihan. Panduan isyarat terverifikasi untuk tiap topik belum tersedia.')),
         ...['Halo', 'Terima kasih', 'Huruf A'].map((e) => LessonTile(item: {
               'title': e,
-              'category': 'Latihan BISINDO',
-              'duration': 'Perlu 1 menit',
+              'category': 'Topik latihan',
+              'duration': 'Materi',
               'icon': '✋'
             }, onTap: () => onOpen(e))),
         const SizedBox(height: 10),
-        TextButton.icon(
-            onPressed: () => onOpen('Hasil latihan'),
-            icon: const Icon(Icons.insights_rounded),
-            label: const Text('Lihat ringkasan latihan terakhir'))
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: FirebaseService.watchPracticeSessions(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return SoftCard(
+                  child: Text('Riwayat sesi latihan gagal dimuat: '
+                      '${snapshot.error}'));
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const LinearProgressIndicator();
+            }
+            final sessions = snapshot.data ?? [];
+            if (sessions.isEmpty) {
+              return const SoftCard(
+                  child: Text(
+                      'Sesi latihan yang diselesaikan akan muncul di sini.'));
+            }
+            final duration = sessions.first['durationSeconds'] as int? ?? 0;
+            return SoftCard(
+              color: GesturaTheme.mint,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sesi terakhir: ${_formatPracticeDuration(duration)}'),
+                  const SizedBox(height: 8),
+                  TextButton(
+                      onPressed: () => onOpen('Riwayat latihan'),
+                      child: const Text('Lihat riwayat latihan')),
+                ],
+              ),
+            );
+          },
+        )
       ]));
 }
 
@@ -363,92 +413,113 @@ class ProfileTab extends StatelessWidget {
   const ProfileTab({required this.onOpen, super.key});
   final void Function(String) onOpen;
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseService.currentUser;
-    final name = user?.displayName?.trim().isNotEmpty == true
-        ? user!.displayName!.trim()
-        : 'Pengguna gestura';
-    final email = user?.email ?? '';
-    return StreamBuilder<List<Map<String, dynamic>>>(
-        stream: FirebaseService.watchProgress(),
-        builder: (context, snapshot) => SafeArea(
-                child: ListView(padding: const EdgeInsets.all(20), children: [
-              const PageHeading('Profil saya'),
-              SoftCard(
-                  child: Row(children: [
-                CircleAvatar(
-                    radius: 32,
-                    backgroundColor: GesturaTheme.mint,
-                    child: Text(_initials(name),
-                        style: const TextStyle(
-                            color: GesturaTheme.teal,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 20))),
-                const SizedBox(width: 14),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(name,
+  Widget build(BuildContext context) => StreamBuilder<Map<String, dynamic>?>(
+      stream: FirebaseService.watchProfile(),
+      builder: (context, profileSnapshot) {
+        final user = FirebaseService.currentUser;
+        final savedName = profileSnapshot.data?['displayName'] as String?;
+        final name = savedName?.trim().isNotEmpty == true
+            ? savedName!.trim()
+            : user?.displayName?.trim().isNotEmpty == true
+                ? user!.displayName!.trim()
+                : 'Pengguna Gestura';
+        final email =
+            profileSnapshot.data?['email'] as String? ?? user?.email ?? '';
+        return StreamBuilder<List<Map<String, dynamic>>>(
+            stream: FirebaseService.watchProgress(),
+            builder: (context, snapshot) {
+              final progressItems = snapshot.data ?? const [];
+              final completedLessons =
+                  progressItems.where((item) => item['kind'] != 'quiz').length;
+              final completedQuizzes =
+                  progressItems.where((item) => item['kind'] == 'quiz').length;
+              return SafeArea(
+                  child: ListView(padding: const EdgeInsets.all(20), children: [
+                const PageHeading('Profil saya'),
+                SoftCard(
+                    child: Row(children: [
+                  CircleAvatar(
+                      radius: 32,
+                      backgroundColor: GesturaTheme.mint,
+                      child: Text(_initials(name),
                           style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17,
-                              color: GesturaTheme.ink)),
-                      Text(email,
-                          style: const TextStyle(
-                              color: GesturaTheme.muted, fontSize: 13))
-                    ])),
-                IconButton(
-                    onPressed: () => onOpen('Edit profil'),
-                    icon: const Icon(Icons.edit_outlined))
-              ])),
-              const SizedBox(height: 14),
-              SoftCard(
-                  color: const Color(0xFFFFF1D2),
-                  child: Row(children: [
-                    const Icon(Icons.auto_stories_rounded,
-                        color: GesturaTheme.teal),
-                    const SizedBox(width: 12),
-                    Expanded(
-                        child: Text(
-                            snapshot.hasError
-                                ? 'Progres gagal dimuat.\n${snapshot.error}'
-                                : snapshot.connectionState ==
-                                        ConnectionState.waiting
-                                    ? 'Memuat progres belajar...'
-                                    : '${snapshot.data?.length ?? 0} materi dipelajari\nProgres belajarmu tersimpan di Firestore.',
+                              color: GesturaTheme.teal,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 20))),
+                  const SizedBox(width: 14),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(name,
                             style: const TextStyle(
-                                height: 1.5,
-                                fontWeight: FontWeight.w600,
-                                color: GesturaTheme.ink)))
-                  ])),
-              const SizedBox(height: 22),
-              const PageHeading('Akun dan preferensi'),
-              ...[
-                'Edit profil',
-                'Pengaturan akun',
-                'Ubah password',
-                'Ubah email',
-                'Pengaturan notifikasi',
-                'Pengaturan tampilan',
-                'Pengaturan kamera dan izin',
-                'Bantuan dan FAQ',
-                'Kirim masukan',
-                'Tentang gestura',
-                'Riwayat belajar'
-              ].map((e) => SettingsMenuRow(e, onTap: () => onOpen(e))),
-              const SizedBox(height: 10),
-              SettingsMenuRow('Keluar',
-                  icon: Icons.logout_rounded,
-                  onTap: () => onOpen('Konfirmasi logout')),
-              SettingsMenuRow('Hapus akun',
-                  icon: Icons.delete_outline_rounded,
-                  onTap: () => onOpen('Konfirmasi hapus akun'))
-            ])));
-  }
+                                fontWeight: FontWeight.w800,
+                                fontSize: 17,
+                                color: GesturaTheme.ink)),
+                        Text(email,
+                            style: const TextStyle(
+                                color: GesturaTheme.muted, fontSize: 13))
+                      ])),
+                  IconButton(
+                      onPressed: () => onOpen('Edit profil'),
+                      icon: const Icon(Icons.edit_outlined))
+                ])),
+                const SizedBox(height: 14),
+                SoftCard(
+                    color: const Color(0xFFFFF1D2),
+                    child: Row(children: [
+                      const Icon(Icons.auto_stories_rounded,
+                          color: GesturaTheme.teal),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Text(
+                              snapshot.hasError
+                                  ? 'Progres gagal dimuat.\n${snapshot.error}'
+                                  : snapshot.connectionState ==
+                                          ConnectionState.waiting
+                                      ? 'Memuat progres belajar...'
+                                      : '$completedLessons materi selesai • '
+                                          '$completedQuizzes kuis selesai\n'
+                                          'Progres belajarmu tersimpan di Firestore.',
+                              style: const TextStyle(
+                                  height: 1.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: GesturaTheme.ink)))
+                    ])),
+                const SizedBox(height: 22),
+                const PageHeading('Akun dan preferensi'),
+                ...[
+                  'Edit profil',
+                  'Pengaturan akun',
+                  'Ubah password',
+                  'Ubah email',
+                  'Pengaturan notifikasi',
+                  'Pengaturan tampilan',
+                  'Pengaturan kamera dan izin',
+                  'Bantuan dan FAQ',
+                  'Kirim masukan',
+                  'Tentang Gestura',
+                  'Riwayat belajar'
+                ].map((e) => SettingsMenuRow(e, onTap: () => onOpen(e))),
+                const SizedBox(height: 10),
+                SettingsMenuRow('Keluar',
+                    icon: Icons.logout_rounded,
+                    onTap: () => onOpen('Konfirmasi logout')),
+                SettingsMenuRow('Hapus akun',
+                    icon: Icons.delete_outline_rounded,
+                    onTap: () => onOpen('Konfirmasi hapus akun'))
+              ]));
+            });
+      });
 }
 
 String _initials(String name) {
   final parts = name.split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
   return parts.take(2).map((part) => part[0].toUpperCase()).join();
+}
+
+String _formatPracticeDuration(int seconds) {
+  final minutes = seconds ~/ 60;
+  final remainingSeconds = seconds % 60;
+  return '$minutes menit $remainingSeconds detik';
 }

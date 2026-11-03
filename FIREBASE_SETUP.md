@@ -1,4 +1,4 @@
-# Menyiapkan Firebase untuk gestura
+# Menyiapkan Firebase untuk Gestura
 
 Firebase Auth dan Cloud Firestore sudah dipakai oleh aplikasi. Ikuti langkah ini
 satu kali untuk menghubungkan aplikasi ke project Firebase milikmu.
@@ -8,14 +8,14 @@ satu kali untuk menghubungkan aplikasi ke project Firebase milikmu.
 1. Buka [Firebase Console](https://console.firebase.google.com/) dan buat project.
 2. Tambahkan aplikasi Android dengan package name `com.example.gestura`.
 3. Buka **Authentication → Sign-in method**, lalu aktifkan **Email/Password**
-   dan **Google**. Untuk Google, isi nama publik `gestura` dan pilih email
+   dan **Google**. Untuk Google, isi nama publik `Gestura` dan pilih email
    support project.
 4. Buka **Firestore Database** dan buat database. Untuk tugas ini, pilih lokasi
    yang dekat dengan pengguna aplikasi.
 5. Di halaman **Firestore Database → Rules**, salin isi file
    [`firestore.rules`](./firestore.rules), lalu tekan **Publish**. Aturan ini
-   membatasi setiap pengguna agar hanya bisa membaca dan mengubah profil serta
-   progres miliknya sendiri.
+   membatasi setiap pengguna agar hanya bisa mengakses profil, progres, sesi
+   latihan, dan masukan miliknya sendiri.
 6. Untuk Google Sign-In Android, tambahkan fingerprint **SHA-1 debug** aplikasi
    di **Project settings → Your apps → aplikasi Android → Add fingerprint**.
    Di project ini, ambil nilainya dengan `.\gradlew signingReport` dari folder
@@ -31,7 +31,7 @@ satu kali untuk menghubungkan aplikasi ke project Firebase milikmu.
    - Di **Authentication → Settings → Authorized domains**, pastikan
      `gestura-b095.firebaseapp.com` terdaftar.
    - Tautan verifikasi baru dibuat dengan Firebase Hosting link dan
-     `handleCodeInApp`. Android akan membuka gestura jika tautan berasal dari
+     `handleCodeInApp`. Android akan membuka Gestura jika tautan berasal dari
      domain tersebut dan aplikasi terpasang.
 
 ## 2. Hubungkan aplikasi Flutter
@@ -63,9 +63,9 @@ File itu menghubungkan aplikasi ke project Firebase-mu.
 ## 3. Coba alur aplikasi
 
 1. Tekan **Mulai belajar**, isi nama, email, dan password (minimal 8 karakter).
-   gestura mengirim tautan verifikasi; akun email/password belum bisa membuka
+   Gestura mengirim tautan verifikasi; akun email/password belum bisa membuka
    materi sampai tautan itu dibuka. Di ponsel Android yang sama, tautan
-   verifikasi baru akan membuka gestura dan membawa pengguna ke aplikasi
+   verifikasi baru akan membuka Gestura dan membawa pengguna ke aplikasi
    setelah status email diperbarui. Google Sign-In memverifikasi akun melalui
    Google dan bisa langsung digunakan.
 2. Pendaftaran email/password membuat akun di Firebase Authentication dan
@@ -78,7 +78,20 @@ File itu menghubungkan aplikasi ke project Firebase-mu.
 5. **Lupa password?** mengirim tautan pengaturan ulang melalui email. Jika
    email belum terverifikasi, layar verifikasi menyediakan opsi untuk mengirim
    ulang tautan atau memeriksa status verifikasi.
+6. Dari **Pengaturan akun**, pilih **Konfirmasi hapus akun** untuk menghapus
+   akun Firebase Authentication, profil, dan seluruh progres. Pengguna harus
+   mengonfirmasi kembali password aplikasi atau masuk kembali dengan Google.
+7. Nama pada **Edit profil** disimpan di Firebase Authentication dan
+   `users/{uid}` di Firestore. Perubahan email baru aktif setelah tautan
+   verifikasi dari email baru dibuka. Password hanya dapat diubah untuk akun
+   Email/Password; akun Google mengelola password melalui Google.
+8. Preview kamera hanya menampilkan gambar langsung dan lama sesi latihan.
+   Gestura tidak merekam gambar atau mengenali gerakan. Hasil kuis dan durasi
+   latihan disimpan ke Firestore.
 
 Password hanya dikelola Firebase Authentication, tidak disimpan di Firestore.
-Untuk versi tugas ini, konten materi tetap menggunakan data lokal; FastAPI
-belum diperlukan untuk autentikasi atau progres.
+Folder `assets/videos` dan direktori dataset server belum memiliki bahan.
+Karena itu video peraga dan pengenalan gerakan BISINDO belum tersedia; aplikasi
+menjelaskan batasan tersebut dan tidak menampilkan hasil pengenalan palsu.
+Untuk versi tugas ini, katalog topik materi tetap menggunakan data lokal;
+FastAPI belum digunakan untuk autentikasi atau progres.

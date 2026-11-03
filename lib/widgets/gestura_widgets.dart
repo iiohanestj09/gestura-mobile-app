@@ -73,76 +73,45 @@ class PrimaryButton extends StatelessWidget {
       label: Text(label));
 }
 
-class VideoPlaceholder extends StatefulWidget {
+class VideoPlaceholder extends StatelessWidget {
   const VideoPlaceholder({required this.title, super.key});
   final String title;
-  @override
-  State<VideoPlaceholder> createState() => _VideoPlaceholderState();
-}
 
-class _VideoPlaceholderState extends State<VideoPlaceholder> {
-  bool playing = false;
   @override
   Widget build(BuildContext context) => Container(
-      height: 230,
-      decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF7650DF), Color(0xFF38206D)]),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-                color: GesturaTheme.tealDark.withValues(alpha: .22),
-                blurRadius: 22,
-                offset: const Offset(0, 12))
-          ]),
-      child: Stack(children: [
-        Positioned.fill(
-            child: Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-              width: 68,
-              height: 68,
-              decoration: const BoxDecoration(
-                  color: GesturaTheme.yellow, shape: BoxShape.circle),
-              child: IconButton(
-                  icon: Icon(
-                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      size: 34,
-                      color: GesturaTheme.ink),
-                  onPressed: () => setState(() => playing = !playing))),
-          const SizedBox(height: 14),
-          const Text('VIDEO PERAGA BISINDO',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  letterSpacing: 1.4,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(widget.title,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700))
-        ]))),
-        Positioned(
-            left: 16,
-            right: 16,
-            bottom: 13,
-            child: Row(children: [
-              const Text('0:00',
-                  style: TextStyle(color: Colors.white70, fontSize: 11)),
-              Expanded(
-                  child: Slider(
-                      value: playing ? .38 : 0,
-                      onChanged: (v) => setState(() => playing = v > 0),
-                      activeColor: GesturaTheme.yellow,
-                      inactiveColor: Colors.white24)),
-              const Text('0:42',
-                  style: TextStyle(color: Colors.white70, fontSize: 11))
-            ]))
-      ]));
+        height: 190,
+        decoration: BoxDecoration(
+            color: GesturaTheme.tealDark,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                  color: GesturaTheme.tealDark.withValues(alpha: .22),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12))
+            ]),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.video_library_outlined,
+                  size: 42, color: Colors.white70),
+              const SizedBox(height: 12),
+              const Text('VIDEO PERAGA BELUM TERSEDIA',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      letterSpacing: 1.1,
+                      fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              Text(title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14)),
+            ],
+          ),
+        ),
+      );
 }
 
 class LabelChip extends StatelessWidget {
@@ -237,7 +206,7 @@ IconData _settingsMenuIcon(String title) => switch (title) {
       'Pengaturan kamera dan izin' => Icons.camera_alt_outlined,
       'Bantuan dan FAQ' => Icons.help_outline,
       'Kirim masukan' => Icons.chat_bubble_outline,
-      'Tentang gestura' => Icons.info_outline,
+      'Tentang Gestura' => Icons.info_outline,
       'Riwayat belajar' => Icons.history,
       _ => Icons.chevron_right
     };

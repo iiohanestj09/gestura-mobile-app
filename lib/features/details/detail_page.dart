@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart' hide FirebaseService;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/gestura_theme.dart';
 import '../../data/sample_data.dart';
 import '../../data/firebase_service.dart';
+import '../auth/auth_pages.dart';
+import 'camera_practice_page.dart';
 import '../../widgets/gestura_widgets.dart';
 
 class DetailPage extends StatefulWidget {
@@ -19,22 +22,43 @@ class DetailPage extends StatefulWidget {
 }
 
 class _DetailPageState extends State<DetailPage> {
-  bool playing = false;
-  final Map<String, bool> settingsValues = {};
+  bool deletingAccount = false;
+  bool savingForm = false;
   final search = TextEditingController();
   final formController = TextEditingController();
+  final profileNameController = TextEditingController();
+  final emailController = TextEditingController();
+  final currentPasswordController = TextEditingController();
+  final newPasswordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
+  final feedbackController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseService.currentUser;
+    profileNameController.text = user?.displayName ?? '';
+    emailController.text = user?.email ?? '';
+  }
+
   @override
   void dispose() {
     search.dispose();
     formController.dispose();
+    profileNameController.dispose();
+    emailController.dispose();
+    currentPasswordController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
+    feedbackController.dispose();
     super.dispose();
   }
 
   void go(String page) => widget.onOpen(page);
 
-  Future<void> _completeLesson() async {
+  Future<void> _completeLesson(String title) async {
     try {
-      await FirebaseService.completeLesson(widget.title);
+      await FirebaseService.completeLesson(title);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Progres materi berhasil disimpan.')));
@@ -46,6 +70,24 @@ class _DetailPageState extends State<DetailPage> {
     }
   }
 
+  Widget _lessonCompletionButton(String title) => StreamBuilder<bool>(
+        stream: FirebaseService.watchLessonCompleted(title),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Text('Status progres gagal dimuat: ${snapshot.error}');
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const LinearProgressIndicator();
+          }
+          final completed = snapshot.data == true;
+          return PrimaryButton(
+            completed ? 'Materi sudah selesai' : 'Tandai materi selesai',
+            onPressed: completed ? null : () => _completeLesson(title),
+            icon: completed ? Icons.check_circle : Icons.check_circle_outline,
+          );
+        },
+      );
+
   Future<void> _logout(BuildContext context) async {
     try {
       await widget.onLogout();
@@ -56,6 +98,44 @@ class _DetailPageState extends State<DetailPage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(error.message ?? 'Gagal keluar (${error.code}).')));
+    }
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    setState(() => deletingAccount = true);
+    try {
+      await FirebaseService.deleteAccount(
+        password: formController.text,
+      );
+      if (!context.mounted) return;
+      final navigator = Navigator.of(context);
+      navigator.popUntil((route) => route.isFirst);
+      navigator.push(
+        MaterialPageRoute(builder: (_) => const AuthPage(mode: 'Masuk')),
+      );
+    } on FirebaseAuthException catch (error) {
+      if (!context.mounted) return;
+      final message =
+          error.code == 'wrong-password' || error.code == 'invalid-credential'
+              ? 'Password aplikasi atau akun Google tidak cocok.'
+              : error.message ?? 'Penghapusan akun gagal (${error.code}).';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } on FirebaseException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text(error.message ?? 'Penghapusan gagal (${error.code}).')));
+    } on GoogleSignInException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Login Google gagal: $error')));
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => deletingAccount = false);
     }
   }
 
@@ -81,6 +161,9 @@ class _DetailPageState extends State<DetailPage> {
     if (title == 'Cari materi') {
       return _search(context);
     }
+    if (title == 'Notifikasi') {
+      return _notifications(context);
+    }
     if (title == 'Konfirmasi logout' || title == 'Konfirmasi hapus akun') {
       return _confirm(context, title);
     }
@@ -104,7 +187,7 @@ class _DetailPageState extends State<DetailPage> {
     if (title == 'Video demonstrasi bahasa isyarat') {
       return _video(context);
     }
-    if (title == 'Simulasi percakapan' ||
+    if (title == 'Skenario percakapan' ||
         title == 'Detail skenario percakapan') {
       return _conversation(context);
     }
@@ -120,11 +203,14 @@ class _DetailPageState extends State<DetailPage> {
         title == 'Kirim masukan') {
       return _formPage(context, title);
     }
-    if (title == 'Bantuan dan FAQ' || title == 'Tentang gestura') {
+    if (title == 'Bantuan dan FAQ' || title == 'Tentang Gestura') {
       return _info(context, title);
     }
     if (title == 'Riwayat belajar') {
       return _history(context);
+    }
+    if (title == 'Riwayat latihan') {
+      return _practiceHistory(context);
     }
     if (title == 'Kategori pembelajaran' ||
         SampleData.categories.any((e) => e['name'] == title)) {
@@ -183,7 +269,7 @@ class _DetailPageState extends State<DetailPage> {
             .map((e) => LessonTile(item: {
                   'title': e,
                   'category': 'Kosakata BISINDO',
-                  'duration': 'Materi video',
+                  'duration': 'Materi',
                   'icon': '💬'
                 }, onTap: () => go(e)))
       ]));
@@ -216,7 +302,7 @@ class _DetailPageState extends State<DetailPage> {
               item: {
                 'title': 'Angka $number',
                 'category': 'Angka BISINDO',
-                'duration': 'Video peraga',
+                'duration': 'Materi',
                 'icon': '$number',
               },
               onTap: () => go('Angka $number'),
@@ -226,7 +312,7 @@ class _DetailPageState extends State<DetailPage> {
           ...SampleData.words.map((w) => LessonTile(item: {
                 'title': w,
                 'category': 'BISINDO',
-                'duration': 'Video demonstrasi',
+                'duration': 'Materi',
                 'icon': '💬'
               }, onTap: () => go(w)))
       ]
@@ -235,9 +321,11 @@ class _DetailPageState extends State<DetailPage> {
 
   Widget _course(BuildContext context, String title) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const PageHeading('Belajar dari dasar',
-            subtitle:
-                'Materi tersusun dari pengenalan gerakan hingga percakapan.'),
+        PageHeading(
+            title == 'Daftar course' || title == 'Detail course'
+                ? 'Belajar dari dasar'
+                : title,
+            subtitle: 'Jelajahi daftar materi belajar yang tersedia.'),
         ...SampleData.courses.map((e) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: SoftCard(
@@ -249,16 +337,8 @@ class _DetailPageState extends State<DetailPage> {
                       const SizedBox(height: 12),
                       Text(e, style: Theme.of(context).textTheme.titleLarge),
                       const SizedBox(height: 6),
-                      const Text('Materi video peraga dan latihan terarah.'),
-                      const SizedBox(height: 14),
-                      const LinearProgressIndicator(
-                          value: .32,
-                          color: GesturaTheme.teal,
-                          backgroundColor: GesturaTheme.mint),
-                      const SizedBox(height: 12),
-                      const Text('2 dari 6 lesson • progres belajar',
-                          style: TextStyle(
-                              color: GesturaTheme.muted, fontSize: 12))
+                      const Text(
+                          'Topik pembelajaran tersedia. Video peraga untuk materi ini belum disediakan.')
                     ])))),
         const SizedBox(height: 8),
         PrimaryButton('Lihat daftar lesson',
@@ -276,7 +356,7 @@ class _DetailPageState extends State<DetailPage> {
         ...SampleData.words.take(4).map((e) => LessonTile(item: {
               'title': e,
               'category': 'Kosakata',
-              'duration': '4 menit',
+              'duration': 'Materi',
               'icon': '💬'
             }, onTap: () => go(e))),
         const SizedBox(height: 8),
@@ -291,8 +371,7 @@ class _DetailPageState extends State<DetailPage> {
                 : 'MATERI BISINDO'),
         const SizedBox(height: 14),
         PageHeading(title,
-            subtitle:
-                'Amati gerakan peraga, lalu coba praktikkan dengan nyaman.'),
+            subtitle: 'Buka materi dan gunakan latihan mandiri jika tersedia.'),
         VideoPlaceholder(title: title),
         TextButton.icon(
             onPressed: () => go('Video demonstrasi bahasa isyarat'),
@@ -302,7 +381,7 @@ class _DetailPageState extends State<DetailPage> {
         const PageHeading('Yang akan kamu pelajari'),
         const SoftCard(
             child: Text(
-                'Perhatikan bentuk tangan dan arah gerak secara utuh. Setiap video pada demo ini adalah placeholder yang menunggu rekaman peraga autentik BISINDO.')),
+                'Video contoh dan uraian gerakan terverifikasi untuk materi ini belum tersedia. Jangan jadikan daftar kata ini sebagai panduan bentuk isyarat.')),
         const SizedBox(height: 20),
         PrimaryButton('Latih gerakan ini',
             onPressed: () => go('Instruksi praktik'),
@@ -311,19 +390,16 @@ class _DetailPageState extends State<DetailPage> {
             onPressed: () => go('Kuis materi'),
             child: const Text('Coba kuis materi')),
         const SizedBox(height: 8),
-        PrimaryButton('Tandai materi selesai',
-            onPressed: _completeLesson, icon: Icons.check_circle_outline)
+        _lessonCompletionButton(title)
       ]));
   Widget _video(BuildContext context) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const PageHeading('Video demonstrasi',
-            subtitle: 'Video peraga akan ditambahkan pada tahap berikutnya.'),
+            subtitle: 'Belum ada video peraga yang dapat diputar.'),
         const VideoPlaceholder(title: 'Materi BISINDO'),
         const SizedBox(height: 18),
-        const LabelChip('PLACEHOLDER VIDEO'),
-        const SizedBox(height: 12),
         const Text(
-            'Belajar dengan mengamati gerakan peraga dari beberapa sudut. Belum ada rekaman autentik pada demo UI ini.'),
+            'Folder assets/videos masih kosong. Materi video BISINDO perlu ditambahkan dari sumber terverifikasi yang memiliki izin penggunaan.'),
         const SizedBox(height: 22),
         PrimaryButton('Praktikkan gerakan',
             onPressed: () => go('Instruksi praktik'))
@@ -331,7 +407,7 @@ class _DetailPageState extends State<DetailPage> {
   Widget _alphabet(BuildContext context) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const PageHeading('Belajar alfabet BISINDO',
-            subtitle: 'Pilih huruf untuk melihat materi dan video peraga.'),
+            subtitle: 'Pilih huruf untuk membuka halaman materinya.'),
         GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -358,12 +434,12 @@ class _DetailPageState extends State<DetailPage> {
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         PageHeading(
             title == 'Pembelajaran kosakata' ? 'Kosakata sehari-hari' : title,
-            subtitle: 'Kumpulan kata BISINDO untuk kebutuhan sehari-hari.'),
+            subtitle: 'Daftar kata untuk latihan kosakata.'),
         if (title == 'Pembelajaran kosakata')
           ...SampleData.words.map((e) => LessonTile(item: {
                 'title': e,
                 'category': 'BISINDO',
-                'duration': 'Video peraga',
+                'duration': 'Materi',
                 'icon': '💬'
               }, onTap: () => go(e)))
         else ...[
@@ -372,7 +448,7 @@ class _DetailPageState extends State<DetailPage> {
           const LabelChip('KOSAKATA BISINDO'),
           const SizedBox(height: 14),
           const Text(
-              'Amati bentuk dan gerakan tangan dari video peraga. Gunakan latihan untuk mencoba gerakan ini.'),
+              'Video dan panduan bentuk isyarat untuk kata ini belum tersedia.'),
           const SizedBox(height: 22),
           PrimaryButton('Latihan kata ini',
               onPressed: () => go('Instruksi praktik'))
@@ -383,23 +459,24 @@ class _DetailPageState extends State<DetailPage> {
         const PageHeading('Kalimat sederhana',
             subtitle: 'Rangkai kosakata menjadi pesan yang mudah dipahami.'),
         ...[
-          'Nama saya Yohanes',
+          'Perkenalkan, nama saya ...',
           'Apa kabar?',
           'Saya ingin belajar',
           'Terima kasih banyak'
         ].map((e) => LessonTile(item: {
               'title': e,
               'category': 'Kalimat BISINDO',
-              'duration': '6 menit',
+              'duration': 'Materi',
               'icon': '📝'
             }, onTap: () => go(e))),
-        PrimaryButton('Simulasi percakapan',
-            onPressed: () => go('Simulasi percakapan'))
+        PrimaryButton('Lihat skenario percakapan',
+            onPressed: () => go('Skenario percakapan'))
       ]));
   Widget _conversation(BuildContext context) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const PageHeading('Skenario: di kafe',
-            subtitle: 'Amati percakapan terarah dengan video peraga.'),
+            subtitle:
+                'Konteks percakapan lisan, bukan panduan isyarat BISINDO.'),
         const VideoPlaceholder(title: 'Memesan minuman'),
         const SizedBox(height: 18),
         const SoftCard(
@@ -410,18 +487,15 @@ class _DetailPageState extends State<DetailPage> {
                   fontWeight: FontWeight.w800, color: GesturaTheme.ink)),
           SizedBox(height: 6),
           Text(
-              'Kamu ingin memesan minuman dan menyampaikan pilihan kepada barista. Pelajari frasa yang digunakan satu per satu.')
+              'Contoh urutan dialog: menyapa barista, menyampaikan pesanan, lalu mengucapkan terima kasih. Contoh frasa BISINDO belum tersedia.')
         ])),
         const SizedBox(height: 20),
-        PrimaryButton('Pelajari frasa percakapan',
-            onPressed: () => go('Daftar lesson')),
-        TextButton(
-            onPressed: () => go('Detail skenario percakapan'),
-            child: const Text('Lihat detail skenario'))
+        PrimaryButton('Lihat topik materi',
+            onPressed: () => go('Daftar lesson'))
       ]));
   Widget _practiceInstructions(BuildContext context) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const LabelChip('LATIHAN DEMO'),
+        const LabelChip('LATIHAN MANDIRI'),
         const SizedBox(height: 14),
         const PageHeading('Siapkan latihanmu',
             subtitle: 'Pilih gerakan yang baru saja kamu pelajari.'),
@@ -434,11 +508,12 @@ class _DetailPageState extends State<DetailPage> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text('Gerakan: Halo',
+                    Text('Latihan mandiri',
                         style: TextStyle(
                             fontWeight: FontWeight.w800,
                             color: GesturaTheme.ink)),
-                    Text('Berdiri nyaman dan pastikan tangan terlihat jelas.')
+                    Text(
+                        'Gunakan materi BISINDO terverifikasi sebagai panduan saat tersedia.')
                   ]))
             ])),
         const SizedBox(height: 18),
@@ -446,224 +521,263 @@ class _DetailPageState extends State<DetailPage> {
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
         const SizedBox(height: 10),
         const Text(
-            '• Cari tempat dengan cahaya cukup\n• Letakkan tangan di dalam area kamera\n• Ikuti gerakan dari materi video'),
+            '• Cari tempat dengan cahaya cukup\n• Pastikan tangan terlihat di kamera\n• Ikuti panduan dari pengajar atau sumber BISINDO terverifikasi'),
         const SizedBox(height: 22),
         PrimaryButton('Buka kamera latihan',
             onPressed: () => go('Kamera praktik'),
             icon: Icons.camera_alt_rounded),
         const SizedBox(height: 8),
         const Center(
-            child: Text('Hasil pengenalan adalah simulasi UI',
+            child: Text(
+                'Gestura belum dapat menilai ketepatan gerakan secara otomatis.',
+                textAlign: TextAlign.center,
                 style: TextStyle(color: GesturaTheme.muted, fontSize: 12)))
       ]));
-  Widget _camera(BuildContext context) => _wrap(Column(children: [
-        const PageHeading('Kamera latihan',
-            subtitle: 'Arahkan tangan ke dalam area panduan.'),
-        Container(
-            height: 310,
-            width: double.infinity,
-            decoration: BoxDecoration(
-                color: GesturaTheme.tealDark,
-                borderRadius: BorderRadius.circular(24)),
-            child: Stack(alignment: Alignment.center, children: [
-              const Positioned(
-                  top: 16,
-                  left: 16,
-                  child:
-                      LabelChip('PREVIEW SIMULASI', color: Color(0xFFD8EFE3))),
-              Container(
-                  width: 190,
-                  height: 220,
-                  decoration: BoxDecoration(
-                      border: Border.all(color: GesturaTheme.yellow, width: 2),
-                      borderRadius: BorderRadius.circular(24)),
-                  child: const Center(
-                      child: Icon(Icons.front_hand_rounded,
-                          size: 78, color: Colors.white38))),
-              const Positioned(
-                  bottom: 18,
-                  child: Text('Preview kamera belum diaktifkan',
-                      style: TextStyle(color: Colors.white70, fontSize: 12)))
-            ])),
-        const SizedBox(height: 16),
-        const SoftCard(
-            child: Row(children: [
-          Icon(Icons.info_outline, color: GesturaTheme.teal),
-          SizedBox(width: 10),
-          Expanded(
-              child: Text(
-                  'Tidak ada gambar yang direkam. Tombol di bawah menjalankan hasil latihan demo.'))
-        ])),
-        const SizedBox(height: 18),
-        PrimaryButton('Periksa gerakan',
-            onPressed: () => go('Hasil pengenalan gerakan'),
-            icon: Icons.center_focus_strong_rounded)
-      ]));
+  Widget _camera(BuildContext context) => const CameraPracticePage();
   Widget _result(BuildContext context, String title) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Center(
-            child: CircleAvatar(
-                radius: 40,
-                backgroundColor: GesturaTheme.mint,
-                child: Icon(Icons.check_rounded,
-                    size: 42, color: GesturaTheme.teal))),
-        const SizedBox(height: 18),
-        PageHeading(
-            title == 'Hasil latihan' ? 'Latihan selesai' : 'Gerakan cocok!',
-            subtitle: 'Simulasi pengenalan • bukan hasil Computer Vision'),
-        SoftCard(
-            color: const Color(0xFFE2F4EF),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const LabelChip('HASIL SIMULASI'),
-              const SizedBox(height: 12),
-              Text('Prediksi: Halo',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 6),
-              const Text('Status gerakan: Cocok',
-                  style: TextStyle(
-                      color: GesturaTheme.tealDark,
-                      fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              const Text(
-                  'Bagus! Tangan sudah berada di area yang terlihat. Terus amati video peraga untuk menyempurnakan gerakan.')
-            ])),
-        const SizedBox(height: 20),
-        PrimaryButton('Ulangi latihan',
-            onPressed: () => go('Kamera praktik'), icon: Icons.replay_rounded),
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Kembali ke materi'))
-      ]));
-  Widget _quiz(BuildContext context) =>
-      _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const PageHeading('Kuis: salam dan sapaan',
-            subtitle: 'Pilih jawaban yang paling sesuai.'),
-        const LabelChip('PERTANYAAN 1 DARI 3'),
-        const SizedBox(height: 16),
-        const Text(
-            'Apa yang sebaiknya kamu lakukan sebelum menirukan gerakan dari video?',
-            style: TextStyle(
-                fontSize: 19,
-                color: GesturaTheme.ink,
-                fontWeight: FontWeight.w800)),
-        const SizedBox(height: 18),
-        ...[
-          'Amati bentuk dan arah gerakan',
-          'Menebak tanpa melihat',
-          'Menutup tangan dari kamera'
-        ].map((e) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: SoftCard(
-                onTap: () => go('Hasil kuis'),
-                child: Row(children: [
-                  const Icon(Icons.radio_button_off, color: GesturaTheme.teal),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Text(e,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: GesturaTheme.ink)))
-                ])))),
-        const SizedBox(height: 12),
-        PrimaryButton('Lihat hasil kuis', onPressed: () => go('Hasil kuis'))
-      ]));
-  Widget _quizResult(BuildContext context) => _wrap(Column(children: [
-        const Icon(Icons.task_alt_rounded, size: 70, color: GesturaTheme.teal),
-        const SizedBox(height: 14),
-        const PageHeading('Kuis selesai', subtitle: 'Jawaban benar: 2 dari 3'),
+        const PageHeading('Pengenalan gerakan belum tersedia',
+            subtitle:
+                'Gestura belum dapat memeriksa apakah gerakan bahasa isyarat sudah benar.'),
         const SoftCard(
             child: Text(
-                'Terus belajar dan ulangi materi yang masih ingin kamu kuasai. Progres belajar tidak menggunakan poin atau hadiah.')),
+                'Model Computer Vision dan data BISINDO terverifikasi belum tersedia. Preview kamera hanya membantu latihan mandiri; aplikasi tidak menebak atau mengklaim gerakanmu benar.')),
         const SizedBox(height: 20),
-        PrimaryButton('Ulangi kuis', onPressed: () => go('Kuis materi')),
+        PrimaryButton('Kembali ke kamera',
+            onPressed: () => go('Kamera praktik'),
+            icon: Icons.camera_alt_rounded),
         TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Kembali ke materi'))
       ]));
-  Widget _confirm(BuildContext context, String title) =>
-      _wrap(Column(children: [
-        const SizedBox(height: 38),
-        CircleAvatar(
-            radius: 38,
-            backgroundColor: const Color(0xFFFFF1D2),
-            child: Icon(
-                title.contains('logout') ? Icons.logout : Icons.delete_outline,
-                color: GesturaTheme.teal,
-                size: 34)),
-        const SizedBox(height: 20),
-        PageHeading(title,
-            subtitle: title.contains('logout')
-                ? 'Kamu bisa masuk kembali untuk melanjutkan progres belajarmu.'
-                : 'Penghapusan akun hanya simulasi. Tidak ada data yang benar-benar dihapus.'),
-        PrimaryButton(
-            title.contains('logout') ? 'Keluar dari akun' : 'Saya mengerti',
-            onPressed: () {
-          if (title.contains('logout')) {
-            _logout(context);
-          } else {
-            Navigator.pop(context);
-          }
-        }),
-        TextButton(
-            onPressed: () => Navigator.pop(context), child: const Text('Batal'))
+  Widget _notifications(BuildContext context) => _wrap(const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageHeading('Notifikasi', subtitle: 'Belum ada notifikasi baru.'),
+          SoftCard(
+              child: Text(
+                  'Notifikasi push belum diaktifkan di aplikasi ini. Pengingat dan pembaruan tidak akan dikirim ke perangkat.'))
+        ],
+      ));
+
+  Widget _quiz(BuildContext context) => const QuizFlow();
+  Widget _quizResult(BuildContext context) => _wrap(const Column(children: [
+        PageHeading('Hasil kuis',
+            subtitle: 'Selesaikan semua pertanyaan untuk melihat nilaimu.'),
       ]));
-  Widget _settings(BuildContext context, String title) =>
-      _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        PageHeading(title,
-            subtitle: 'Preferensi ini tersimpan sementara selama sesi demo.'),
-        if (title == 'Pengaturan notifikasi') ...[
-          _switch('Pengingat materi baru'),
-          _switch('Pembaruan akun'),
-          _switch('Tips belajar')
-        ],
-        if (title == 'Pengaturan tampilan') ...[
-          _switch('Kurangi animasi'),
-          _switch('Gunakan tampilan kontras tinggi'),
-          ListTile(
-              title: const Text('Ukuran teks'),
-              subtitle: const Text('Standar'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ukuran teks: standar'))))
-        ],
-        if (title == 'Pengaturan kamera dan izin') ...[
+  Widget _confirm(BuildContext context, String title) {
+    final isLogout = title.contains('logout');
+    final providers =
+        FirebaseService.currentUser?.providerData.map((p) => p.providerId) ??
+            const <String>[];
+    final requiresPassword = providers.contains('password');
+    final supportsGoogle = providers.contains('google.com');
+
+    return _wrap(Column(children: [
+      const SizedBox(height: 38),
+      CircleAvatar(
+          radius: 38,
+          backgroundColor: const Color(0xFFFFF1D2),
+          child: Icon(isLogout ? Icons.logout : Icons.delete_outline,
+              color: GesturaTheme.teal, size: 34)),
+      const SizedBox(height: 20),
+      PageHeading(title,
+          subtitle: isLogout
+              ? 'Kamu bisa masuk kembali untuk melanjutkan progres belajarmu.'
+              : 'Akun dan seluruh progres belajar akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.'),
+      if (!isLogout && requiresPassword) ...[
+        const SizedBox(height: 18),
+        TextField(
+          controller: formController,
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: 'Password aplikasi',
+            hintText: 'Masukkan password akun Gestura',
+          ),
+        ),
+      ] else if (!isLogout && supportsGoogle) ...[
+        const SizedBox(height: 12),
+        const Text('Kamu akan diminta masuk kembali dengan akun Google.'),
+      ] else if (!isLogout) ...[
+        const SizedBox(height: 12),
+        const Text('Metode masuk akun ini belum didukung untuk penghapusan.'),
+      ],
+      const SizedBox(height: 20),
+      PrimaryButton(
+        isLogout
+            ? 'Keluar dari akun'
+            : deletingAccount
+                ? 'Menghapus akun…'
+                : 'Hapus akun permanen',
+        onPressed: deletingAccount ||
+                (!isLogout && !requiresPassword && !supportsGoogle)
+            ? null
+            : () {
+                if (isLogout) {
+                  _logout(context);
+                } else if (requiresPassword || supportsGoogle) {
+                  _deleteAccount(context);
+                }
+              },
+      ),
+      TextButton(
+          onPressed: deletingAccount ? null : () => Navigator.pop(context),
+          child: const Text('Batal'))
+    ]));
+  }
+
+  Widget _settings(BuildContext context, String title) {
+    if (title == 'Pengaturan kamera dan izin') {
+      return _wrap(Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageHeading(title,
+              subtitle:
+                  'Izin kamera diminta oleh Android saat fitur digunakan.'),
           const SoftCard(
               child: Text(
-                  'Status kamera\nKamera belum dihubungkan. Saat fitur diaktifkan, izin kamera akan diminta sebelum latihan.',
-                  style: TextStyle(height: 1.5))),
-          const SizedBox(height: 14),
-          _switch('Izinkan kamera untuk latihan'),
-          _switch('Tampilkan panduan area tangan')
-        ]
-      ]));
-  Widget _switch(String label) => StatefulBuilder(
-      builder: (context, setLocal) => SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(label),
-          value: settingsValues[label] ?? true,
-          activeThumbColor: GesturaTheme.teal,
-          onChanged: (v) {
-            settingsValues[label] = v;
-            setLocal(() {});
-          }));
+                  'Gestura belum memiliki model pengenalan bahasa isyarat. Kamera tidak akan menganalisis atau menyimpan gambar.')),
+          const SizedBox(height: 12),
+          PrimaryButton('Buka preview kamera',
+              onPressed: () => go('Kamera praktik'),
+              icon: Icons.camera_alt_rounded),
+        ],
+      ));
+    }
+
+    final featureName = title == 'Pengaturan notifikasi'
+        ? 'Notifikasi push'
+        : 'Pengaturan tampilan';
+    final explanation = title == 'Pengaturan notifikasi'
+        ? 'Pengiriman notifikasi push, pengingat belajar, dan pembaruan akun belum diaktifkan.'
+        : 'Pengaturan ukuran teks, kontras, dan animasi belum tersedia. Aplikasi menggunakan tampilan standar.';
+    return _wrap(Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PageHeading(title, subtitle: '$featureName belum tersedia.'),
+        SoftCard(child: Text(explanation)),
+      ],
+    ));
+  }
+
+  Future<void> _saveForm(BuildContext context, String title) async {
+    setState(() => savingForm = true);
+    try {
+      switch (title) {
+        case 'Edit profil':
+          await FirebaseService.updateDisplayName(profileNameController.text);
+          break;
+        case 'Ubah email':
+          await FirebaseService.sendEmailChangeVerification(
+            emailController.text,
+            password: formController.text,
+          );
+          break;
+        case 'Ubah password':
+          if (newPasswordController.text != confirmPasswordController.text) {
+            throw ArgumentError('Konfirmasi password baru tidak cocok.');
+          }
+          await FirebaseService.changePassword(
+            currentPassword: currentPasswordController.text,
+            newPassword: newPasswordController.text,
+          );
+          break;
+        case 'Kirim masukan':
+          await FirebaseService.submitFeedback(feedbackController.text);
+          break;
+        default:
+          return;
+      }
+
+      if (!context.mounted) return;
+      final message = switch (title) {
+        'Edit profil' => 'Nama profil berhasil diperbarui.',
+        'Ubah email' =>
+          'Tautan verifikasi perubahan email telah dikirim ke alamat baru.',
+        'Ubah password' => 'Password berhasil diperbarui.',
+        _ => 'Masukan berhasil dikirim.',
+      };
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      Navigator.pop(context);
+    } on FirebaseAuthException catch (error) {
+      if (!context.mounted) return;
+      final message = switch (error.code) {
+        'wrong-password' ||
+        'invalid-credential' =>
+          'Password saat ini tidak cocok.',
+        'requires-recent-login' =>
+          'Silakan masuk kembali, lalu ulangi perubahan ini.',
+        'email-already-in-use' => 'Email tersebut sudah digunakan.',
+        _ => error.message ?? 'Perubahan gagal (${error.code}).',
+      };
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } on FirebaseException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message ?? 'Penyimpanan gagal (${error.code}).'),
+        ),
+      );
+    } on ArgumentError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message.toString())));
+    } on StateError catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    } on GoogleSignInException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login Google gagal: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => savingForm = false);
+    }
+  }
+
   Widget _formPage(BuildContext context, String title) {
+    final providers =
+        FirebaseService.currentUser?.providerData.map((p) => p.providerId) ??
+            const <String>[];
+    final usesPasswordProvider = providers.contains('password');
+    final usesGoogleProvider = providers.contains('google.com');
+    final isEditableForm = title == 'Edit profil' ||
+        title == 'Ubah email' ||
+        title == 'Ubah password' ||
+        title == 'Kirim masukan';
+
     return _wrap(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      PageHeading(title,
-          subtitle: 'Perubahan disimulasikan dan tidak dikirim ke server.'),
+      PageHeading(
+        title,
+        subtitle: switch (title) {
+          'Edit profil' => 'Nama ini akan diperbarui di akun dan Firestore.',
+          'Ubah email' => 'Email baru aktif setelah tautan verifikasi dibuka.',
+          'Ubah password' =>
+            'Perubahan dilakukan melalui Firebase Authentication.',
+          'Kirim masukan' =>
+            'Masukan disimpan agar pengelola project dapat meninjau.',
+          _ => 'Kelola pengaturan akun Gestura.',
+        },
+      ),
       if (title == 'Edit profil') ...[
         const Text('Nama lengkap'),
         const SizedBox(height: 8),
         TextFormField(
-            initialValue: 'Yohanes Putra',
+            controller: profileNameController,
+            textCapitalization: TextCapitalization.words,
+            maxLength: 50,
             decoration:
                 const InputDecoration(prefixIcon: Icon(Icons.person_outline))),
         const SizedBox(height: 16),
         const Text('Email'),
         const SizedBox(height: 8),
         TextFormField(
-            initialValue: 'yohanes@email.com',
+            controller: emailController,
+            readOnly: true,
             decoration:
                 const InputDecoration(prefixIcon: Icon(Icons.mail_outline)))
       ],
@@ -671,22 +785,54 @@ class _DetailPageState extends State<DetailPage> {
         const Text('Email baru'),
         const SizedBox(height: 8),
         TextField(
-            controller: formController,
+            controller: emailController,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(hintText: 'email@contoh.com'))
+            decoration: const InputDecoration(
+                hintText: 'email@contoh.com',
+                prefixIcon: Icon(Icons.mail_outline))),
+        if (usesPasswordProvider) ...[
+          const SizedBox(height: 16),
+          const Text('Password saat ini'),
+          const SizedBox(height: 8),
+          TextField(
+              controller: formController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                  hintText: 'Konfirmasi password aplikasi'))
+        ] else if (usesGoogleProvider) ...[
+          const SizedBox(height: 12),
+          const Text('Kamu akan diminta masuk kembali dengan Google.')
+        ]
       ],
       if (title == 'Ubah password') ...[
-        for (final x in [
-          'Password saat ini',
-          'Password baru',
-          'Ulangi password baru'
-        ]) ...[
-          Text(x),
+        if (usesPasswordProvider) ...[
+          const Text('Password saat ini'),
           const SizedBox(height: 8),
-          const TextField(
+          TextField(
+              controller: currentPasswordController,
               obscureText: true,
-              decoration: InputDecoration(hintText: 'Minimal 8 karakter')),
-          const SizedBox(height: 14)
+              decoration: const InputDecoration(
+                  hintText: 'Masukkan password saat ini')),
+          const SizedBox(height: 14),
+          const Text('Password baru'),
+          const SizedBox(height: 8),
+          TextField(
+              controller: newPasswordController,
+              obscureText: true,
+              decoration:
+                  const InputDecoration(hintText: 'Minimal 8 karakter')),
+          const SizedBox(height: 14),
+          const Text('Ulangi password baru'),
+          const SizedBox(height: 8),
+          TextField(
+              controller: confirmPasswordController,
+              obscureText: true,
+              decoration:
+                  const InputDecoration(hintText: 'Ketik ulang password baru')),
+        ] else ...[
+          const SoftCard(
+              child: Text(
+                  'Akun ini menggunakan Google. Password dikelola melalui akun Google dan tidak dapat diubah dari Gestura.'))
         ]
       ],
       if (title == 'Pengaturan akun')
@@ -695,46 +841,62 @@ class _DetailPageState extends State<DetailPage> {
       if (title == 'Kirim masukan') ...[
         const Text('Ceritakan pengalamanmu'),
         const SizedBox(height: 8),
-        const TextField(
+        TextField(
+            controller: feedbackController,
             maxLines: 5,
-            decoration: InputDecoration(hintText: 'Tulis masukan di sini...'))
+            maxLength: 2000,
+            decoration:
+                const InputDecoration(hintText: 'Tulis masukan di sini...'))
       ],
       const SizedBox(height: 22),
-      PrimaryButton('Simpan perubahan', onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Perubahan disimpan untuk demo ini.')));
-        Navigator.pop(context);
-      })
+      if (isEditableForm)
+        PrimaryButton(
+          savingForm ? 'Menyimpan…' : 'Simpan perubahan',
+          onPressed:
+              savingForm || (title == 'Ubah password' && !usesPasswordProvider)
+                  ? null
+                  : () => _saveForm(context, title),
+        )
     ]));
   }
 
   Widget _info(BuildContext context, String title) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(
-            title == 'Tentang gestura'
+            title == 'Tentang Gestura'
                 ? Icons.waving_hand_rounded
                 : Icons.help_outline_rounded,
             size: 48,
             color: GesturaTheme.teal),
         const SizedBox(height: 16),
         PageHeading(title,
-            subtitle: title == 'Tentang gestura'
-                ? 'gestura membantu pemula belajar BISINDO melalui materi visual yang bertahap.'
+            subtitle: title == 'Tentang Gestura'
+                ? 'Gestura membantu pemula belajar BISINDO melalui materi visual yang bertahap.'
                 : 'Temukan jawaban untuk pertanyaan umum.'),
-        if (title == 'Tentang gestura')
+        if (title == 'Tentang Gestura')
           const SoftCard(
               child: Text(
-                  'gestura • Versi demo UI 1.0\nDibuat sebagai media belajar BISINDO. Materi video peraga dan fitur pengenalan gerakan akan dikembangkan pada tahap berikutnya.'))
+                  'Gestura membantu mengelola progres belajar dan menyediakan preview kamera untuk latihan mandiri. Video peraga dan pengenalan gerakan otomatis belum tersedia.'))
         else
           ...[
-            'Apa itu BISINDO?',
-            'Apakah pengenalan kamera sudah aktif?',
-            'Bagaimana cara memulai belajar?'
-          ].map((e) => ExpansionTile(title: Text(e), children: const [
+            (
+              question: 'Apa itu BISINDO?',
+              answer:
+                  'BISINDO adalah Bahasa Isyarat Indonesia yang digunakan oleh komunitas Tuli di Indonesia. Bahasa isyarat memiliki tata bahasa dan variasi penggunaan sendiri.'
+            ),
+            (
+              question: 'Apakah pengenalan kamera sudah aktif?',
+              answer:
+                  'Kamera hanya menampilkan preview untuk latihan mandiri. Gestura belum memiliki model BISINDO untuk mengenali atau menilai gerakan.'
+            ),
+            (
+              question: 'Bagaimana cara memulai belajar?',
+              answer:
+                  'Pilih topik dari tab Belajar. Tandai materi selesai untuk menyimpan progres, atau gunakan preview kamera untuk latihan mandiri.'
+            ),
+          ].map((faq) => ExpansionTile(title: Text(faq.question), children: [
                 Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                        'Demo gestura menyediakan pembelajaran visual secara bertahap. Fitur video dan pengenalan akan menggunakan materi autentik saat tersedia.'))
+                    padding: const EdgeInsets.all(16), child: Text(faq.answer))
               ]))
       ]));
   Widget _history(BuildContext context) =>
@@ -762,7 +924,7 @@ class _DetailPageState extends State<DetailPage> {
           return _wrap(
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const PageHeading('Riwayat belajar',
-                subtitle: 'Materi yang sudah kamu tandai selesai.'),
+                subtitle: 'Materi dan kuis yang sudah kamu selesaikan.'),
             if (progress.isEmpty)
               const SoftCard(
                   color: GesturaTheme.mint,
@@ -771,9 +933,10 @@ class _DetailPageState extends State<DetailPage> {
             else ...[
               ...progress.map((item) {
                 final title = item['title'] as String? ?? 'Materi BISINDO';
+                final isQuiz = item['kind'] == 'quiz';
                 return LessonTile(item: {
                   'title': title,
-                  'category': 'Materi selesai',
+                  'category': isQuiz ? 'Kuis selesai' : 'Materi selesai',
                   'duration': 'Progres tersimpan',
                   'icon': '✓'
                 }, onTap: () => go(title));
@@ -781,7 +944,7 @@ class _DetailPageState extends State<DetailPage> {
               SoftCard(
                   color: GesturaTheme.mint,
                   child: Text(
-                      '${progress.length} materi selesai • Progres tersimpan di Firestore.',
+                      '${progress.length} item belajar selesai • Progres tersimpan di Firestore.',
                       style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           color: GesturaTheme.tealDark)))
@@ -789,4 +952,284 @@ class _DetailPageState extends State<DetailPage> {
           ]));
         },
       );
+
+  Widget _practiceHistory(BuildContext context) =>
+      StreamBuilder<List<Map<String, dynamic>>>(
+        stream: FirebaseService.watchPracticeSessions(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _wrap(Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const PageHeading('Riwayat latihan'),
+                Text('Riwayat gagal dimuat: ${snapshot.error}'),
+              ],
+            ));
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _wrap(const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PageHeading('Riwayat latihan',
+                    subtitle: 'Memuat sesi latihan...'),
+                LinearProgressIndicator(),
+              ],
+            ));
+          }
+          final sessions = snapshot.data ?? [];
+          return _wrap(Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const PageHeading('Riwayat latihan',
+                  subtitle: 'Durasi sesi yang kamu selesaikan.'),
+              if (sessions.isEmpty)
+                const SoftCard(
+                    child: Text('Belum ada sesi latihan yang diselesaikan.'))
+              else
+                ...List.generate(sessions.length, (index) {
+                  final seconds =
+                      sessions[index]['durationSeconds'] as int? ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: SoftCard(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.front_hand_rounded,
+                              color: GesturaTheme.teal),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Sesi latihan ${sessions.length - index}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          Text(_formatPracticeDuration(seconds)),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+            ],
+          ));
+        },
+      );
+}
+
+String _formatPracticeDuration(int seconds) {
+  final minutes = seconds ~/ 60;
+  final remainingSeconds = seconds % 60;
+  return '$minutes menit $remainingSeconds detik';
+}
+
+class QuizFlow extends StatefulWidget {
+  const QuizFlow({super.key});
+
+  @override
+  State<QuizFlow> createState() => _QuizFlowState();
+}
+
+class _QuizFlowState extends State<QuizFlow> {
+  static const questions = [
+    (
+      question: 'Saat mempelajari gerakan baru, apa yang sebaiknya diamati?',
+      choices: [
+        'Bentuk tangan dan arah gerak secara utuh',
+        'Hanya warna pakaian peraga',
+        'Menebak gerakan tanpa memperhatikan'
+      ],
+      answer: 0,
+    ),
+    (
+      question: 'Apa yang membantu saat berlatih mandiri menggunakan kamera?',
+      choices: [
+        'Pencahayaan cukup dan tangan terlihat jelas',
+        'Merekam orang lain tanpa izin',
+        'Berlatih di tempat yang gelap'
+      ],
+      answer: 0,
+    ),
+    (
+      question:
+          'Jika belum yakin dengan suatu gerakan BISINDO, apa langkah terbaik?',
+      choices: [
+        'Memastikan kembali kepada pengajar atau komunitas BISINDO',
+        'Menganggap semua bahasa isyarat sama',
+        'Menyebarkan tebakan sebagai jawaban pasti'
+      ],
+      answer: 0,
+    ),
+  ];
+
+  int questionIndex = 0;
+  int? selectedAnswer;
+  int correctAnswers = 0;
+  bool answerChecked = false;
+  bool savingResult = false;
+  bool finished = false;
+  String? saveError;
+
+  Future<void> _advance() async {
+    if (!answerChecked || selectedAnswer == null) return;
+    if (questionIndex < questions.length - 1) {
+      setState(() {
+        questionIndex++;
+        selectedAnswer = null;
+        answerChecked = false;
+      });
+      return;
+    }
+
+    setState(() => savingResult = true);
+    try {
+      await FirebaseService.recordQuizResult(
+        correctAnswers: correctAnswers,
+        totalQuestions: questions.length,
+      );
+    } on FirebaseException catch (error) {
+      saveError = error.message ?? 'Hasil gagal disimpan (${error.code}).';
+    } on StateError catch (error) {
+      saveError = error.message;
+    } finally {
+      if (mounted) {
+        setState(() {
+          savingResult = false;
+          finished = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (finished) {
+      return SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          children: [
+            const Icon(Icons.task_alt_rounded,
+                size: 70, color: GesturaTheme.teal),
+            const SizedBox(height: 14),
+            PageHeading(
+              'Kuis selesai',
+              subtitle:
+                  'Jawaban benar: $correctAnswers dari ${questions.length}.',
+            ),
+            if (saveError != null)
+              SoftCard(child: Text('Hasil belum tersimpan: $saveError'))
+            else
+              const SoftCard(
+                  child:
+                      Text('Hasil kuis sudah tersimpan di riwayat belajar.')),
+            const SizedBox(height: 20),
+            PrimaryButton(
+              'Ulangi kuis',
+              onPressed: () => setState(() {
+                questionIndex = 0;
+                selectedAnswer = null;
+                correctAnswers = 0;
+                answerChecked = false;
+                finished = false;
+                saveError = null;
+              }),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Kembali ke materi'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final question = questions[questionIndex];
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        children: [
+          const PageHeading('Kuis: salam dan sapaan',
+              subtitle: 'Pilih jawaban yang paling sesuai.'),
+          LabelChip('PERTANYAAN ${questionIndex + 1} DARI ${questions.length}'),
+          const SizedBox(height: 16),
+          Text(question.question,
+              style: const TextStyle(
+                  fontSize: 19,
+                  color: GesturaTheme.ink,
+                  fontWeight: FontWeight.w800)),
+          const SizedBox(height: 18),
+          ...List.generate(question.choices.length, (index) {
+            final isSelected = selectedAnswer == index;
+            final isCorrect = index == question.answer;
+            final color = answerChecked && isCorrect
+                ? GesturaTheme.mint
+                : answerChecked && isSelected
+                    ? const Color(0xFFFFE6E3)
+                    : Colors.white;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SoftCard(
+                color: color,
+                onTap: answerChecked
+                    ? null
+                    : () => setState(() => selectedAnswer = index),
+                child: Row(children: [
+                  Icon(
+                    answerChecked && isCorrect
+                        ? Icons.check_circle
+                        : answerChecked && isSelected
+                            ? Icons.cancel
+                            : isSelected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                    color: answerChecked && !isCorrect && isSelected
+                        ? Colors.red
+                        : GesturaTheme.teal,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Text(question.choices[index],
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: GesturaTheme.ink))),
+                ]),
+              ),
+            );
+          }),
+          if (answerChecked) ...[
+            const SizedBox(height: 6),
+            Text(
+              selectedAnswer == question.answer
+                  ? 'Benar.'
+                  : 'Belum tepat. Jawaban yang benar ditandai di atas.',
+              style: const TextStyle(
+                  color: GesturaTheme.tealDark, fontWeight: FontWeight.w700),
+            ),
+          ],
+          const SizedBox(height: 12),
+          PrimaryButton(
+            savingResult
+                ? 'Menyimpan hasil…'
+                : answerChecked
+                    ? questionIndex == questions.length - 1
+                        ? 'Lihat hasil'
+                        : 'Pertanyaan berikutnya'
+                    : 'Periksa jawaban',
+            onPressed: savingResult || selectedAnswer == null
+                ? null
+                : () {
+                    if (!answerChecked) {
+                      setState(() {
+                        answerChecked = true;
+                        if (selectedAnswer == question.answer) {
+                          correctAnswers++;
+                        }
+                      });
+                    } else {
+                      _advance();
+                    }
+                  },
+          ),
+        ],
+      ),
+    );
+  }
 }

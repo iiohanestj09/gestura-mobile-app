@@ -19,7 +19,7 @@ class WelcomePage extends StatelessWidget {
                     const Row(children: [
                       BrandMark(),
                       SizedBox(width: 10),
-                      Text('gestura',
+                      Text('Gestura',
                           style: TextStyle(
                               fontSize: 23,
                               fontWeight: FontWeight.w900,
@@ -54,7 +54,7 @@ class WelcomePage extends StatelessWidget {
                         style: Theme.of(context).textTheme.headlineMedium),
                     const SizedBox(height: 12),
                     const Text(
-                        'Mulai belajar BISINDO dengan video peraga, materi bertahap, dan latihan yang menyenangkan.',
+                        'Mulai belajar BISINDO melalui materi bertahap dan latihan mandiri.',
                         style:
                             TextStyle(color: GesturaTheme.muted, height: 1.5)),
                     const Spacer(),
@@ -410,10 +410,10 @@ String _authSubtitle(String mode) => switch (mode) {
       'Daftar' => 'Buat akun untuk menyimpan progres belajarmu.',
       'Lupa password' =>
         'Masukkan email dan kami bantu kamu mengatur ulang password.',
-      _ => 'Mulai belajar BISINDO dengan gestura.'
+      _ => 'Mulai belajar BISINDO dengan Gestura.'
     };
 String _authAction(String mode) => switch (mode) {
-      'Masuk' => 'Masuk ke gestura',
+      'Masuk' => 'Masuk ke Gestura',
       'Daftar' => 'Buat akun',
       'Lupa password' => 'Kirim tautan reset',
       _ => 'Lanjutkan'
