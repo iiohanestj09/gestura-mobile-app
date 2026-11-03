@@ -1,3 +1,5 @@
+server\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir server --host 0.0.0.0 --port 8000
+
 # Gestura - model alfabet statis
 
 Pipeline ini melatih classifier alfabet A-Z dari gambar di

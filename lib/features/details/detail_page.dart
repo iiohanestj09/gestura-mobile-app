@@ -557,38 +557,26 @@ class _DetailPageState extends State<DetailPage> {
     String? target,
   }) =>
       _wrap(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const LabelChip('LATIHAN MANDIRI'),
-        const SizedBox(height: 14),
         PageHeading(
-            category == null || target == null
-                ? 'Siapkan latihanmu'
-                : 'Latihan ${category.displayName}: $target',
-            subtitle: 'Pilih gerakan yang baru saja kamu pelajari.'),
+          category == null || target == null
+              ? 'Contoh gerakan'
+              : 'Contoh isyarat $target',
+          subtitle:
+              'Tonton video peragaan sebelum mulai latihan. Video contoh sedang disiapkan.',
+        ),
+        VideoPlaceholder(
+          title: category == null || target == null
+              ? 'Video tutor BISINDO'
+              : '${category.displayName} • $target',
+        ),
+        const SizedBox(height: 16),
         const SoftCard(
-            color: GesturaTheme.mint,
-            child: Row(children: [
-              Text('👋', style: TextStyle(fontSize: 34)),
-              SizedBox(width: 14),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text('Latihan mandiri',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: GesturaTheme.ink)),
-                    Text(
-                        'Gunakan materi BISINDO terverifikasi sebagai panduan saat tersedia.')
-                  ]))
-            ])),
-        const SizedBox(height: 18),
-        const Text('Tips sebelum mulai',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-        const SizedBox(height: 10),
-        const Text(
-            '• Cari tempat dengan cahaya cukup\n• Pastikan tangan terlihat di kamera\n• Ikuti panduan dari pengajar atau sumber BISINDO terverifikasi'),
+          child: Text(
+            'Video tutor untuk target ini masih dalam proses pembuatan. Saat tersedia, video akan tampil di area ini.',
+          ),
+        ),
         const SizedBox(height: 22),
-        PrimaryButton('Buka kamera latihan',
+        PrimaryButton('Mulai latihan',
             onPressed: () => go(category == null || target == null
                 ? 'Kamera praktik'
                 : 'Kamera praktik|${category.apiValue}|$target'),

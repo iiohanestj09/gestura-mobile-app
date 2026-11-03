@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import tempfile
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -22,6 +24,7 @@ from app.firebase_auth import (
 )
 
 MAX_UPLOAD_BYTES = 30 * 1024 * 1024
+logger = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
@@ -45,6 +48,27 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def log_prediction_requests(request: Request, call_next):
+    if (
+        request.method != "POST"
+        or not request.url.path.startswith("/api/v1/predict/")
+    ):
+        return await call_next(request)
+
+    started_at = time.monotonic()
+    logger.info("Prediction request received: %s", request.url.path)
+    response = await call_next(request)
+    elapsed = time.monotonic() - started_at
+    logger.info(
+        "Prediction request completed: %s status=%s duration=%.2fs",
+        request.url.path,
+        response.status_code,
+        elapsed,
+    )
+    return response
 
 
 @app.get("/health")

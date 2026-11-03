@@ -1,1 +1,24 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"gestura-b095","appId":"1:950261579746:android:5234cd7af025d694e2c3bb","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"gestura-b095","configurations":{"android":"1:950261579746:android:5234cd7af025d694e2c3bb"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "gestura-b095",
+          "appId": "1:950261579746:android:5234cd7af025d694e2c3bb",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "gestura-b095",
+          "configurations": {
+            "android": "1:950261579746:android:5234cd7af025d694e2c3bb"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}

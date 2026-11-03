@@ -54,6 +54,25 @@ void main() {
       expect(result.candidate, 'Merah');
     });
 
+    test('parses a video result without live-frame landmarks', () {
+      final result = GesturePrediction.fromJson({
+        'category': 'alphabet',
+        'status': 'recognized',
+        'label': 'A',
+        'candidate': 'A',
+        'confidence': 0.96,
+        'threshold': 0.7,
+        'reason': null,
+        'model': 'alphabet',
+        'sampled_frames': 12,
+        'detected_frames': 12,
+      });
+
+      expect(result.recognized, isTrue);
+      expect(result.hands, isEmpty);
+      expect(result.sequence, 0);
+    });
+
     test('rejects a response without a supported category', () {
       expect(
         () => GesturePrediction.fromJson({

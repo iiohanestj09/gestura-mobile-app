@@ -98,6 +98,12 @@ class GestureApiException implements Exception {
   String toString() => message;
 }
 
+enum GestureRequestStage {
+  obtainingToken,
+  sendingRequest,
+  awaitingResponse,
+}
+
 class GesturePrediction {
   const GesturePrediction({
     required this.category,
@@ -139,8 +145,8 @@ class GesturePrediction {
     final threshold = json['threshold'];
     final sampledFrames = json['sampled_frames'];
     final detectedFrames = json['detected_frames'];
-    final sequence = json['sequence'];
-    final rawHands = json['hands'];
+    final sequence = json['sequence'] ?? 0;
+    final rawHands = json['hands'] ?? const <dynamic>[];
     if ((status != 'recognized' && status != 'not_recognized') ||
         confidence is! num ||
         threshold is! num ||
@@ -194,7 +200,9 @@ class GestureApiService {
     'GESTURA_API_BASE_URL',
     defaultValue: 'http://10.0.2.2:8000',
   );
+  static String configuredBaseUrl = defaultBaseUrl;
   static const _timeout = Duration(seconds: 90);
+  static const _tokenTimeout = Duration(seconds: 20);
   static final http.Client _client = http.Client();
 
   static Uri _endpoint(String baseUrl, String path) {
@@ -240,26 +248,32 @@ class GestureApiService {
     required GestureCategory category,
     required Uint8List jpegBytes,
     required String sessionId,
+    void Function(GestureRequestStage stage)? onProgress,
   }) async {
     final uri = _endpoint(
       baseUrl,
       '/api/v1/predict/${category.apiValue}/frame',
     );
-    final token = await _firebaseIdToken();
-    final request = http.MultipartRequest('POST', uri)
-      ..headers['Accept'] = 'application/json'
-      ..headers['Authorization'] = 'Bearer $token'
-      ..fields['session_id'] = sessionId
-      ..files.add(
-        http.MultipartFile.fromBytes(
-          'frame',
-          jpegBytes,
-          filename: 'frame.jpg',
-        ),
-      );
-
+    var requestStarted = false;
     try {
+      onProgress?.call(GestureRequestStage.obtainingToken);
+      final token = await _firebaseIdToken().timeout(_tokenTimeout);
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Accept'] = 'application/json'
+        ..headers['Authorization'] = 'Bearer $token'
+        ..fields['session_id'] = sessionId
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'frame',
+            jpegBytes,
+            filename: 'frame.jpg',
+            contentType: http.MediaType('image', 'jpeg'),
+          ),
+        );
+      onProgress?.call(GestureRequestStage.sendingRequest);
+      requestStarted = true;
       final streamedResponse = await _client.send(request).timeout(_timeout);
+      onProgress?.call(GestureRequestStage.awaitingResponse);
       final response =
           await http.Response.fromStream(streamedResponse).timeout(_timeout);
       final data = _decodeResponse(response.body);
@@ -278,6 +292,11 @@ class GestureApiService {
     } on SocketException catch (error) {
       throw GestureApiException('Tidak dapat menghubungi backend: $error');
     } on TimeoutException {
+      if (!requestStarted) {
+        throw const GestureApiException(
+          'Firebase terlalu lama menyiapkan token login. Periksa koneksi internet lalu coba lagi.',
+        );
+      }
       throw const GestureApiException(
         'Proses melewati batas waktu. Periksa koneksi dan coba lagi.',
       );
@@ -317,18 +336,24 @@ class GestureApiService {
     required String baseUrl,
     required GestureCategory category,
     required String videoPath,
+    void Function(GestureRequestStage stage)? onProgress,
   }) async {
     final uri = _endpoint(
       baseUrl,
       '/api/v1/predict/${category.apiValue}',
     );
-    final token = await _firebaseIdToken();
+    var requestStarted = false;
     try {
+      onProgress?.call(GestureRequestStage.obtainingToken);
+      final token = await _firebaseIdToken().timeout(_tokenTimeout);
       final request = http.MultipartRequest('POST', uri)
         ..headers['Accept'] = 'application/json'
         ..headers['Authorization'] = 'Bearer $token'
         ..files.add(await http.MultipartFile.fromPath('video', videoPath));
+      onProgress?.call(GestureRequestStage.sendingRequest);
+      requestStarted = true;
       final streamedResponse = await _client.send(request).timeout(_timeout);
+      onProgress?.call(GestureRequestStage.awaitingResponse);
       final response =
           await http.Response.fromStream(streamedResponse).timeout(_timeout);
       final data = _decodeResponse(response.body);
@@ -347,6 +372,11 @@ class GestureApiService {
     } on SocketException catch (error) {
       throw GestureApiException('Tidak dapat menghubungi backend: $error');
     } on TimeoutException {
+      if (!requestStarted) {
+        throw const GestureApiException(
+          'Firebase terlalu lama menyiapkan token login. Periksa koneksi internet lalu coba lagi.',
+        );
+      }
       throw const GestureApiException(
         'Proses melewati batas waktu. Periksa koneksi dan coba lagi.',
       );
