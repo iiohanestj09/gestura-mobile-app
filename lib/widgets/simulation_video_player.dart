@@ -20,7 +20,6 @@ class SimulationVideoPlayer extends StatefulWidget {
 }
 
 class _SimulationVideoPlayerState extends State<SimulationVideoPlayer> {
-  late final TextEditingController _baseUrlController;
   VideoPlayerController? _videoController;
   String? _error;
   bool _loading = false;
@@ -29,9 +28,6 @@ class _SimulationVideoPlayerState extends State<SimulationVideoPlayer> {
   @override
   void initState() {
     super.initState();
-    _baseUrlController = TextEditingController(
-      text: GestureApiService.configuredBaseUrl,
-    );
     _loadVideo();
   }
 
@@ -56,8 +52,7 @@ class _SimulationVideoPlayerState extends State<SimulationVideoPlayer> {
     }
     await previousController?.dispose();
 
-    final baseUrl = _baseUrlController.text.trim();
-    GestureApiService.configuredBaseUrl = baseUrl;
+    final baseUrl = GestureApiService.configuredBaseUrl;
     VideoPlayerController? controller;
     try {
       final uri = GestureApiService.simulationVideoUri(
@@ -122,7 +117,6 @@ class _SimulationVideoPlayerState extends State<SimulationVideoPlayer> {
   @override
   void dispose() {
     _loadRequestId++;
-    _baseUrlController.dispose();
     final controller = _videoController;
     if (controller != null) {
       controller.dispose();
@@ -134,24 +128,6 @@ class _SimulationVideoPlayerState extends State<SimulationVideoPlayer> {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            controller: _baseUrlController,
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-            onChanged: (value) =>
-                GestureApiService.configuredBaseUrl = value.trim(),
-            onSubmitted: (_) => _loadVideo(),
-            decoration: InputDecoration(
-              labelText: 'Alamat backend video',
-              hintText: 'http://192.168.1.5:8000',
-              suffixIcon: IconButton(
-                tooltip: 'Muat ulang video',
-                onPressed: _loading ? null : _loadVideo,
-                icon: const Icon(Icons.refresh_rounded),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(22),
             child: Container(

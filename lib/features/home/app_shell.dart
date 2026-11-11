@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/gestura_theme.dart';
 import '../../data/firebase_service.dart';
 import '../../data/gesture_api_service.dart';
@@ -16,44 +17,92 @@ class _AppShellState extends State<AppShell> {
   int index = 0;
   GestureCategory? requestedPracticeCategory;
   int practiceRequestId = 0;
+  late Future<void> _settingsReady;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-      body: IndexedStack(index: index, children: [
-        HomeTab(
-          onOpen: open,
-          onSelectPractice: (GestureCategory? category) {
-            setState(() {
-              requestedPracticeCategory = category;
-              practiceRequestId++;
-              index = 1;
-            });
-          },
-        ),
-        PracticeTab(
-          onOpen: open,
-          requestedCategory: requestedPracticeCategory,
-          requestId: practiceRequestId,
-        ),
-        ProfileTab(onOpen: open)
-      ]),
-      bottomNavigationBar: NavigationBar(
-          selectedIndex: index,
-          onDestinationSelected: (i) => setState(() => index = i),
-          destinations: const [
-            NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home_rounded),
-                label: 'Beranda'),
-            NavigationDestination(
-                icon: Icon(Icons.front_hand_outlined),
-                selectedIcon: Icon(Icons.front_hand_rounded),
-                label: 'Latihan'),
-            NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person_rounded),
-                label: 'Akun')
-          ]));
+  void initState() {
+    super.initState();
+    _settingsReady = GestureApiService.loadConfiguredBaseUrl();
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<void>(
+        future: _settingsReady,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Pengaturan alamat backend gagal dimuat.'),
+                      const SizedBox(height: 8),
+                      Text(
+                        snapshot.error.toString(),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      PrimaryButton(
+                        'Coba lagi',
+                        onPressed: () => setState(
+                          () => _settingsReady =
+                              GestureApiService.loadConfiguredBaseUrl(),
+                        ),
+                        icon: Icons.refresh_rounded,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          return Scaffold(
+            body: IndexedStack(index: index, children: [
+              HomeTab(
+                onOpen: open,
+                onSelectPractice: (GestureCategory? category) {
+                  setState(() {
+                    requestedPracticeCategory = category;
+                    practiceRequestId++;
+                    index = 1;
+                  });
+                },
+              ),
+              PracticeTab(
+                onOpen: open,
+                requestedCategory: requestedPracticeCategory,
+                requestId: practiceRequestId,
+              ),
+              ProfileTab(onOpen: open)
+            ]),
+            bottomNavigationBar: NavigationBar(
+                selectedIndex: index,
+                onDestinationSelected: (i) => setState(() => index = i),
+                destinations: const [
+                  NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home_rounded),
+                      label: 'Beranda'),
+                  NavigationDestination(
+                      icon: Icon(Icons.front_hand_outlined),
+                      selectedIcon: Icon(Icons.front_hand_rounded),
+                      label: 'Latihan'),
+                  NavigationDestination(
+                      icon: Icon(Icons.person_outline),
+                      selectedIcon: Icon(Icons.person_rounded),
+                      label: 'Akun')
+                ]),
+          );
+        },
+      );
   void open(String title) => Navigator.push(
       context,
       MaterialPageRoute(
@@ -78,6 +127,8 @@ class HomeTab extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
         children: [
           _welcomeCard(),
+          const SizedBox(height: 20),
+          const BackendSettingsCard(),
           const SizedBox(height: 20),
           _searchBar(),
           const SizedBox(height: 22),
@@ -235,6 +286,131 @@ class HomeTab extends StatelessWidget {
             ),
           );
         },
+      );
+}
+
+class BackendSettingsCard extends StatefulWidget {
+  const BackendSettingsCard({super.key});
+
+  @override
+  State<BackendSettingsCard> createState() => _BackendSettingsCardState();
+}
+
+class _BackendSettingsCardState extends State<BackendSettingsCard> {
+  late final TextEditingController _baseUrlController;
+  final _apiService = GestureApiService();
+  bool _checking = false;
+  String? _status;
+  bool _connected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _baseUrlController = TextEditingController(
+      text: GestureApiService.configuredBaseUrl,
+    );
+  }
+
+  @override
+  void dispose() {
+    _baseUrlController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveAndCheckConnection() async {
+    setState(() {
+      _checking = true;
+      _status = 'Menyimpan alamat dan memeriksa koneksi…';
+      _connected = false;
+    });
+    try {
+      await GestureApiService.saveConfiguredBaseUrl(_baseUrlController.text);
+      final categories = await _apiService.checkHealth(
+        GestureApiService.configuredBaseUrl,
+      );
+      if (!mounted) return;
+      setState(() {
+        _connected = categories.isNotEmpty;
+        _status = categories.isNotEmpty
+            ? 'Alamat tersimpan. Backend terhubung dengan ${categories.length} model.'
+            : 'Alamat tersimpan, tetapi backend tidak melaporkan model aktif.';
+      });
+    } on GestureApiException catch (error) {
+      if (mounted) {
+        setState(() => _status = 'Alamat tersimpan, tetapi ${error.message}');
+      }
+    } on FormatException catch (error) {
+      if (mounted) {
+        setState(() => _status = 'Alamat tersimpan, tetapi ${error.message}');
+      }
+    } on StateError catch (error) {
+      if (mounted) setState(() => _status = error.message);
+    } on PlatformException catch (error) {
+      if (mounted) {
+        setState(() => _status = 'Pengaturan gagal disimpan: ${error.message}');
+      }
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SoftCard(
+        color: const Color(0xFFEDE7FF),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Koneksi backend',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Masukkan alamat FastAPI sekali. Alamat ini dipakai untuk video simulasi dan latihan kamera.',
+              style: TextStyle(color: GesturaTheme.muted, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _baseUrlController,
+              keyboardType: TextInputType.url,
+              autocorrect: false,
+              enabled: !_checking,
+              onChanged: (_) {
+                if (_status != null) {
+                  setState(() {
+                    _status = null;
+                    _connected = false;
+                  });
+                }
+              },
+              decoration: const InputDecoration(
+                labelText: 'Alamat backend FastAPI',
+                hintText: 'http://192.168.1.5:8000',
+                prefixIcon: Icon(Icons.link_rounded),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: PrimaryButton(
+                _checking ? 'Memeriksa koneksi…' : 'Simpan & cek koneksi',
+                onPressed: _checking ? null : _saveAndCheckConnection,
+                icon: _checking ? Icons.sync_rounded : Icons.wifi_rounded,
+              ),
+            ),
+            if (_status != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _status!,
+                style: TextStyle(
+                  color:
+                      _connected ? GesturaTheme.tealDark : Colors.red.shade700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        ),
       );
 }
 

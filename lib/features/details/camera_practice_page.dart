@@ -30,9 +30,6 @@ class _CameraPracticePageState extends State<CameraPracticePage>
 
   CameraController? cameraController;
   final stopwatch = Stopwatch();
-  final apiBaseUrlController = TextEditingController(
-    text: GestureApiService.configuredBaseUrl,
-  );
   final gestureApiService = GestureApiService();
   Timer? elapsedTimer;
   Timer? recordingLimitTimer;
@@ -161,14 +158,14 @@ class _CameraPracticePageState extends State<CameraPracticePage>
   }
 
   Future<void> _checkBackend() async {
-    GestureApiService.configuredBaseUrl = apiBaseUrlController.text.trim();
     setState(() {
       backendStatus = 'Memeriksa koneksi backend…';
       backendCategories = const [];
     });
     try {
-      final categories =
-          await gestureApiService.checkHealth(apiBaseUrlController.text);
+      final categories = await gestureApiService.checkHealth(
+        GestureApiService.configuredBaseUrl,
+      );
       if (!mounted) return;
       setState(() {
         backendCategories = categories;
@@ -266,9 +263,8 @@ class _CameraPracticePageState extends State<CameraPracticePage>
     try {
       video = await controller.stopVideoRecording();
       await _restoreAutoExposure(controller);
-      GestureApiService.configuredBaseUrl = apiBaseUrlController.text.trim();
       final result = await gestureApiService.predictVideo(
-        baseUrl: apiBaseUrlController.text,
+        baseUrl: GestureApiService.configuredBaseUrl,
         category: selectedCategory,
         videoPath: video.path,
         onProgress: (stage) {
@@ -442,7 +438,6 @@ class _CameraPracticePageState extends State<CameraPracticePage>
     final controller = cameraController;
     cameraController = null;
     if (controller != null) unawaited(controller.dispose());
-    apiBaseUrlController.dispose();
     super.dispose();
   }
 
@@ -506,19 +501,14 @@ class _CameraPracticePageState extends State<CameraPracticePage>
               ],
             ),
             ExpansionTile(
-              title: const Text('Pengaturan koneksi'),
+              title: const Text('Status koneksi backend'),
               tilePadding: EdgeInsets.zero,
               children: [
-                TextField(
-                  controller: apiBaseUrlController,
-                  keyboardType: TextInputType.url,
-                  autocorrect: false,
-                  enabled: !recording && !saving,
-                  onChanged: (value) =>
-                      GestureApiService.configuredBaseUrl = value.trim(),
-                  decoration: const InputDecoration(
-                    labelText: 'Alamat backend FastAPI',
-                    hintText: 'http://192.168.1.5:8000',
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    GestureApiService.configuredBaseUrl,
+                    style: const TextStyle(color: GesturaTheme.muted),
                   ),
                 ),
                 Align(

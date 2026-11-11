@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum GestureCategory {
   alphabet('alphabet', 'Alfabet A-Z', _alphabetLabels),
@@ -200,10 +201,30 @@ class GestureApiService {
     'GESTURA_API_BASE_URL',
     defaultValue: 'http://10.0.2.2:8000',
   );
+  static const _baseUrlPreferenceKey = 'gestura_api_base_url';
   static String configuredBaseUrl = defaultBaseUrl;
   static const _timeout = Duration(seconds: 90);
   static const _tokenTimeout = Duration(seconds: 20);
   static final http.Client _client = http.Client();
+
+  static Future<void> loadConfiguredBaseUrl() async {
+    final preferences = await SharedPreferences.getInstance();
+    configuredBaseUrl =
+        preferences.getString(_baseUrlPreferenceKey) ?? defaultBaseUrl;
+  }
+
+  static Future<void> saveConfiguredBaseUrl(String baseUrl) async {
+    final normalizedUrl = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
+    final preferences = await SharedPreferences.getInstance();
+    final saved = await preferences.setString(
+      _baseUrlPreferenceKey,
+      normalizedUrl,
+    );
+    if (!saved) {
+      throw StateError('Alamat backend gagal disimpan di perangkat.');
+    }
+    configuredBaseUrl = normalizedUrl;
+  }
 
   static Uri _endpoint(String baseUrl, String path) {
     final value = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');

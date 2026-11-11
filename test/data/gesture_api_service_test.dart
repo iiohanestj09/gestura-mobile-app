@@ -1,7 +1,21 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestura/data/gesture_api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('persists and restores the backend URL', () async {
+    SharedPreferences.setMockInitialValues({});
+
+    await GestureApiService.saveConfiguredBaseUrl(
+        ' http://192.168.1.10:8000/ ');
+    expect(GestureApiService.configuredBaseUrl, 'http://192.168.1.10:8000');
+
+    GestureApiService.configuredBaseUrl = GestureApiService.defaultBaseUrl;
+    await GestureApiService.loadConfiguredBaseUrl();
+
+    expect(GestureApiService.configuredBaseUrl, 'http://192.168.1.10:8000');
+  });
+
   test('exposes only the supported training targets', () {
     expect(GestureCategory.alphabet.labels, hasLength(26));
     expect(GestureCategory.digit.labels,

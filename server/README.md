@@ -1,3 +1,5 @@
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\Users\Yohanes Putra\Documents\gestura-service-account.json"
+$env:FIREBASE_PROJECT_ID = "gestura-b095"
 server\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir server --host 0.0.0.0 --port 8000
 
 # Gestura - model alfabet statis
@@ -295,14 +297,16 @@ disimpan di `users/{uid}/practiceSessions`. Aturan Firestore di root project
 membatasi data tersebut ke pemilik akun. Setelah memperbarui rules, deploy
 dengan `firebase deploy --only firestore:rules`.
 
-Di Android, layar kamera memiliki pilihan kategori dan alamat backend. Emulator
-Android biasanya dapat memakai `http://10.0.2.2:8000`. Untuk perangkat fisik,
-gunakan IPv4 laptop (contoh `http://192.168.1.5:8000`) dan pastikan keduanya
-berada pada jaringan Wi-Fi yang sama; atau gunakan `adb reverse tcp:8000
-tcp:8000` lalu isi `http://127.0.0.1:8000`. Jika `adb` tidak terdaftar pada
-PATH, gunakan `C:\Android\Sdk\platform-tools\adb.exe reverse tcp:8000 tcp:8000`
-(sesuaikan lokasi SDK bila berbeda). Beri izin akses private network untuk
-Python pada Windows Firewall jika diminta. Tombol **Cek koneksi**
+Di Beranda aplikasi, masukkan alamat backend sekali lalu pilih **Simpan & cek
+koneksi**. Alamat tersimpan di perangkat dan dipakai bersama untuk video
+simulasi serta latihan kamera. Emulator Android biasanya dapat memakai
+`http://10.0.2.2:8000`. Untuk perangkat fisik, gunakan IPv4 laptop (contoh
+`http://192.168.1.5:8000`) dan pastikan keduanya berada pada jaringan Wi-Fi yang
+sama; atau gunakan `adb reverse tcp:8000 tcp:8000` lalu isi
+`http://127.0.0.1:8000`. Jika `adb` tidak terdaftar pada PATH, gunakan
+`C:\Android\Sdk\platform-tools\adb.exe reverse tcp:8000 tcp:8000` (sesuaikan
+lokasi SDK bila berbeda). Beri izin akses private network untuk Python pada
+Windows Firewall jika diminta. Tombol **Cek koneksi** di layar kamera
 memastikan server sudah terjangkau dan model aktif.
 
 Kamera hanya didukung saat aplikasi berjalan pada perangkat/emulator dengan
