@@ -266,6 +266,17 @@ Video sementara di backend dihapus setelah request selesai. Respons berisi
 tangan terdeteksi. Jika gesture tidak meyakinkan, API mengembalikan
 `not_recognized`.
 
+## Video simulasi latihan
+
+Video contoh dari `server/simulation/` disajikan oleh
+`GET /api/v1/simulation/{category}/{target}` dengan kategori `alphabet`,
+`digit`, atau `vocabulary`. File video tidak dimasukkan ke APK; halaman
+instruksi meminta URL backend yang sama seperti untuk latihan, lalu pengguna
+menekan play untuk memutarnya. Karena itu backend harus aktif dan dapat
+dijangkau dari HP (gunakan alamat IPv4 laptop dan Wi-Fi yang sama untuk
+perangkat fisik). Endpoint ini hanya menyajikan file tutorial dan tidak
+membutuhkan login Firebase.
+
 ## Kamera real-time dan penyimpanan
 
 Layar praktik memakai kamera depan dan mengirim satu frame JPEG per request ke

@@ -220,6 +220,16 @@ class GestureApiService {
     return Uri.parse('$value$path');
   }
 
+  static Uri simulationVideoUri({
+    required String baseUrl,
+    required GestureCategory category,
+    required String target,
+  }) =>
+      _endpoint(
+        baseUrl,
+        '/api/v1/simulation/${category.apiValue}/${Uri.encodeComponent(target)}',
+      );
+
   Future<List<String>> checkHealth(String baseUrl) async {
     final uri = _endpoint(baseUrl, '/health');
     try {

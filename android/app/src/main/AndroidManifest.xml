@@ -5,7 +5,8 @@
     <application
         android:label="Gestura"
         android:name="${applicationName}"
-        android:icon="@mipmap/gestura_launcher">
+        android:icon="@mipmap/gestura_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -8,6 +8,7 @@ import '../../data/gesture_api_service.dart';
 import '../auth/auth_pages.dart';
 import 'camera_practice_page.dart';
 import '../../widgets/gestura_widgets.dart';
+import '../../widgets/simulation_video_player.dart';
 
 class DetailPage extends StatefulWidget {
   const DetailPage(
@@ -561,20 +562,16 @@ class _DetailPageState extends State<DetailPage> {
           category == null || target == null
               ? 'Contoh gerakan'
               : 'Contoh isyarat $target',
-          subtitle:
-              'Tonton video peragaan sebelum mulai latihan. Video contoh sedang disiapkan.',
+          subtitle: 'Tekan tombol play untuk melihat simulasi gerakan.',
         ),
-        VideoPlaceholder(
-          title: category == null || target == null
-              ? 'Video tutor BISINDO'
-              : '${category.displayName} • $target',
-        ),
-        const SizedBox(height: 16),
-        const SoftCard(
-          child: Text(
-            'Video tutor untuk target ini masih dalam proses pembuatan. Saat tersedia, video akan tampil di area ini.',
+        if (category != null && target != null)
+          SimulationVideoPlayer(category: category, target: target)
+        else
+          const SoftCard(
+            child: Text(
+              'Pilih kategori dan target dari tab Latihan untuk melihat video simulasi.',
+            ),
           ),
-        ),
         const SizedBox(height: 22),
         PrimaryButton('Mulai latihan',
             onPressed: () => go(category == null || target == null

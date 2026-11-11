@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.inference import (
@@ -22,6 +23,7 @@ from app.firebase_auth import (
     require_firebase_user,
     validate_session_id,
 )
+from app.simulations import simulation_video_path
 
 MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 logger = logging.getLogger("uvicorn.error")
@@ -81,6 +83,22 @@ def health(request: Request) -> dict[str, Any]:
         "service": "gestura-inference",
         "categories": list(CATEGORY_MODELS),
     }
+
+
+@app.get("/api/v1/simulation/{category}/{target}")
+def get_simulation_video(category: str, target: str) -> FileResponse:
+    try:
+        video_path = simulation_video_path(category, target)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    return FileResponse(
+        video_path,
+        media_type="video/mp4",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @app.post("/api/v1/predict/{category}")

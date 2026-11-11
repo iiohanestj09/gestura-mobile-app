@@ -10,6 +10,19 @@ void main() {
     expect(GestureCategory.digit.labels, isNot(contains('0')));
   });
 
+  test('builds the simulation video URL for a target with spaces', () {
+    final uri = GestureApiService.simulationVideoUri(
+      baseUrl: 'http://192.168.1.10:8000/',
+      category: GestureCategory.vocabulary,
+      target: 'Terima kasih',
+    );
+
+    expect(
+      uri.toString(),
+      'http://192.168.1.10:8000/api/v1/simulation/vocabulary/Terima%20kasih',
+    );
+  });
+
   group('GesturePrediction', () {
     test('parses a recognized result for the selected category', () {
       final result = GesturePrediction.fromJson({
